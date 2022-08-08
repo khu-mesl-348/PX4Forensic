@@ -6,6 +6,10 @@ from pymavlink import mavutil
 from threading import Thread
 from src.MavSerialPort import MavlinkSerialPort
 import sys
+from anytree import Node, RenderTree
+from anytree.exporter import DotExporter
+from collections import deque
+
 
 
 # 실시간 Shell을 여는 함수
@@ -110,19 +114,10 @@ def SerialPort():
 #   mav_serialport: serial에 연결된 MAVlinkSerialPort 객체
 # @output: 명령어 실행 후 Shell message
 # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
-def command(param, mav_serialport):
-    cur_line = ''
-    for ch in param:
-        if ch == '\n':
-            # Todo: 위아래로 명령어 이동하는거 만들기
-            # if len(cur_line) > 0:
-            # command_history = []
-            # cur_history_index = 0
-            mav_serialport.write(cur_line + '\n')
-            cur_line = ''
 
-        else:
-            cur_line += ch
+def command(param, mav_serialport):
+    cur_line = ""
+    mav_serialport.write(param)
 
     ret = ''
     while True:
@@ -139,7 +134,88 @@ def command(param, mav_serialport):
 
     return ret
 
+datalist = []
+filelist = []
+folderlist = []
+#오류, 혹은 사용되지 않는 디렉토리 및 파일
+blacklist = [' group/'] #
 
+#command 실행 함수
+def cmd_ls(mav_serialport):
+    global datalist
+    cmd = "ls\n"
+    data = command(cmd, mav_serialport)
+
+    if data.find("nsh:") != -1: # 오류 메시지 출력 
+        print(data)
+    datalist = data.split('\n')
+
+def cmd_cd(param, mav_serialport):
+    cmd = "cd " + param.strip(" ") + "\n"
+    data = command(cmd, mav_serialport)
+    
+    if data.find("nsh:") != -1: # 오류 메시지 출력 
+        print("error: ", data)
+        cmd_ls(mav_serialport)
+        for item in datalist:
+            print(item)
+        datalist.clear()
+        return 1
+
+    return 0
+    
+    
+def cmd_cd_back(mav_serialport):
+    cmd = "cd ..\n"
+    command(cmd, mav_serialport)
+
+
+# 트리 노드 생성    
+# class Node:
+#     def __init__(self, data):
+#         self.data = data
+#         self.child = []
+#         self.parent = None
+
+#     def append_child(self, new_node):
+#         new_node.parent = self
+#         self.child = []
+#         self.child.append(new_node)
+
+class Tree:
+    def __init__(self, mav_serialport):
+        self.stack = []
+        self.mav_serialport = mav_serialport
+
+    def dfs(self, root):
+        self.stack.append(root)
+        while len(self.stack) !=  0:
+            #print(self.stack)
+            item = self.stack.pop()
+            #print(item)
+
+            if "/" in item and item not in blacklist:
+                res = cmd_cd(item, self.mav_serialport)
+                if(res == 1):
+                
+                    continue
+                self.stack.append("..")
+                cmd_ls(self.mav_serialport)
+                
+            if item == "..":
+                if(len(self.stack) == 1 ): 
+                    break
+                cmd_cd_back(self.mav_serialport)
+                continue
+
+            if(len(datalist) != 0):
+                for idx, i in enumerate(datalist):
+                    if idx < 2:
+                        continue
+                    self.stack.append(i)
+
+            datalist.clear()
+        
 def main():
 
     # MAVLink 포트 연결
@@ -150,15 +226,20 @@ def main():
     cur_line = ''
 
     # 실시간으로 Shell 사용할시
-    # live_shell(mav_serialport)
+    #live_shell(mav_serialport)   
 
-    while True:
-        cmd = ubuf_stdin.readline().decode('utf8')
-        data = command(cmd, mav_serialport)
-        print(data)
+    root = "/"
+    tree = Tree(mav_serialport)
 
+    while len(tree.stack) == 0:
+        tree.dfs(root)
+        
+    # while True:
+    #     cmd = ubuf_stdin.readline().decode('utf8')
+    #     data = command(cmd, mav_serialport)
+    #     print(data)
+        
     mav_serialport.close()
-
 
 if __name__ == '__main__':
     main()
