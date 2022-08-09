@@ -6,12 +6,9 @@ from pymavlink import mavutil
 from threading import Thread
 from src.MavSerialPort import MavlinkSerialPort
 import sys
-from anytree import Node, RenderTree
-from anytree.exporter import DotExporter
-from collections import deque
 
-
-
+fd_in = sys.stdin.fileno()
+ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
 # 실시간 Shell을 여는 함수
 # @input: MavlinkSerialPort 객체
 # @output: -
@@ -25,8 +22,6 @@ def live_shell(mav_serialport):
                 sys.stdout.write(data)
 
     try:
-        fd_in = sys.stdin.fileno()
-        ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
         cur_line = ''
         next_heartbeat_time = timer()
 
@@ -116,13 +111,12 @@ def SerialPort():
 # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
 
 def command(param, mav_serialport):
-    cur_line = ""
     mav_serialport.write(param)
-
     ret = ''
     while True:
         data = mav_serialport.read(4096)
         if data and len(data) > 0:
+
             if data.find('nsh>') != -1:
                 # nsh> 제거
                 data = data[:data.find('nsh>')]
@@ -150,10 +144,12 @@ def cmd_ls(mav_serialport):
         print(data)
     datalist = data.split('\n')
 
+
 def cmd_cd(param, mav_serialport):
-    cmd = "cd " + param.strip(" ") + "\n"
+    cmd = "cd " + param.replace("/", "") + "\n"
+    print("cmd :", cmd)
     data = command(cmd, mav_serialport)
-    
+
     if data.find("nsh:") != -1: # 오류 메시지 출력 
         print("error: ", data)
         cmd_ls(mav_serialport)
@@ -170,51 +166,80 @@ def cmd_cd_back(mav_serialport):
     command(cmd, mav_serialport)
 
 
-# 트리 노드 생성    
-# class Node:
-#     def __init__(self, data):
-#         self.data = data
-#         self.child = []
-#         self.parent = None
+# 트리 노드 생성
+class Node:
+    def __init__(self, data):
+        self.data = data
+        self.child = []
+        self.parent = None
 
-#     def append_child(self, new_node):
-#         new_node.parent = self
-#         self.child = []
-#         self.child.append(new_node)
+    def append_child(self, new_node):
+        new_node.parent = self
+        self.child.append(new_node)
 
 class Tree:
     def __init__(self, mav_serialport):
         self.stack = []
         self.mav_serialport = mav_serialport
+        self.root = Node("/")
 
     def dfs(self, root):
         self.stack.append(root)
-        while len(self.stack) !=  0:
-            #print(self.stack)
+        self.root.data = root
+        cur = self.root
+        while len(self.stack) != 0:
+            print(self.stack)
+            print("cur: ", cur.data)
             item = self.stack.pop()
-            #print(item)
 
-            if "/" in item and item not in blacklist:
-                res = cmd_cd(item, self.mav_serialport)
-                if(res == 1):
-                
-                    continue
-                self.stack.append("..")
-                cmd_ls(self.mav_serialport)
+
+            #print(item)
                 
             if item == "..":
                 if(len(self.stack) == 1 ): 
                     break
                 cmd_cd_back(self.mav_serialport)
+                if cur.data != '/':
+                    cur = cur.parent
                 continue
 
+            elif "/" in item and item not in blacklist:
+                cmd_cd(item, self.mav_serialport)
+                self.stack.append("..")
+                cmd_ls(self.mav_serialport)
+                cur =
+
+
+
             if(len(datalist) != 0):
-                for idx, i in enumerate(datalist):
+                for idx, item in enumerate(datalist):
                     if idx < 2:
                         continue
-                    self.stack.append(i)
+                    self.stack.append(item)
+                if (item != '/') and (item != '..') and (item != '.'):
+                    leaf = Node(item)
+                    cur.append_child(leaf)
 
             datalist.clear()
+
+    def search(self):
+        st = []
+        st.append(self.root)
+
+        while len(st) > 0:
+            item = st.pop()
+            print(item.data)
+            for sub in item.child:
+                filename = ''
+                cur = sub
+                if cur.data.find('/') == -1:
+                    while cur.parent != None:
+                        filename = cur.data.replace(" ", "") + filename
+                        print("parent of ", cur.data, ": ", cur.parent.data)
+                        cur = cur.parent
+
+                    print(filename)
+                st.append(sub)
         
 def main():
 
@@ -226,14 +251,14 @@ def main():
     cur_line = ''
 
     # 실시간으로 Shell 사용할시
-    #live_shell(mav_serialport)   
+    #live_shell(mav_serialport)
 
     root = "/"
     tree = Tree(mav_serialport)
 
     while len(tree.stack) == 0:
         tree.dfs(root)
-        
+    tree.search()
     # while True:
     #     cmd = ubuf_stdin.readline().decode('utf8')
     #     data = command(cmd, mav_serialport)
