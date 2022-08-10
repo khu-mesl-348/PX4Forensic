@@ -191,7 +191,7 @@ class Tree:
             print(self.stack)
             print("cur: ", cur.data)
             item = self.stack.pop()
-
+            print("cur: ",cur.data)
 
             #print(item)
                 
@@ -207,8 +207,11 @@ class Tree:
                 cmd_cd(item, self.mav_serialport)
                 self.stack.append("..")
                 cmd_ls(self.mav_serialport)
-                cur =
-
+                for next in cur.child:
+                    print("next: ", next.data,"itm: ", item)
+                    if next.data == item:
+                        cur = next
+                        break
 
 
             if(len(datalist) != 0):
@@ -216,7 +219,7 @@ class Tree:
                     if idx < 2:
                         continue
                     self.stack.append(item)
-                if (item != '/') and (item != '..') and (item != '.'):
+
                     leaf = Node(item)
                     cur.append_child(leaf)
 
@@ -228,17 +231,20 @@ class Tree:
 
         while len(st) > 0:
             item = st.pop()
-            print(item.data)
             for sub in item.child:
                 filename = ''
                 cur = sub
                 if cur.data.find('/') == -1:
                     while cur.parent != None:
                         filename = cur.data.replace(" ", "") + filename
-                        print("parent of ", cur.data, ": ", cur.parent.data)
                         cur = cur.parent
 
+                    # root 경로 추가
+                    filename = '/'+filename
+
+                    # 여기서 각 파일의 경로+파일명이 생성됩니다
                     print(filename)
+
                 st.append(sub)
         
 def main():
