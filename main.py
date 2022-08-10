@@ -180,9 +180,11 @@ class Node:
 class Tree:
     def __init__(self, mav_serialport):
         self.stack = []
+        self.files = []
         self.mav_serialport = mav_serialport
         self.root = Node("/")
 
+    # ls
     def dfs(self, root):
         self.stack.append(root)
         self.root.data = root
@@ -225,6 +227,7 @@ class Tree:
 
             datalist.clear()
 
+    # 구성된 트리를 dfs 탐색하는 함수
     def search(self):
         st = []
         st.append(self.root)
