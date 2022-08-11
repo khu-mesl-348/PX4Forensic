@@ -1,14 +1,17 @@
 from timeit import default_timer as timer
 import serial
-from argparse import ArgumentParser
 import os
 from pymavlink import mavutil
 from threading import Thread
-from src.MavSerialPort import MavlinkSerialPort
+from src.tools import SerialPort
+from PX4Forensic.src.tree import Tree
+import time
 import sys
 
 fd_in = sys.stdin.fileno()
 ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
+
+
 # 실시간 Shell을 여는 함수
 # @input: MavlinkSerialPort 객체
 # @output: -
@@ -17,7 +20,7 @@ def live_shell(mav_serialport):
     # Drone -> GCS로 보내는 MAVLink Shell Message 받을 때 사용.
     def read():
         while True:
-            data = mav_serialport.read(4096)
+            data = mav_serialport.serial_read(4096)
             if data and len(data) > 0:
                 sys.stdout.write(data)
 
@@ -39,7 +42,7 @@ def live_shell(mav_serialport):
                         # if len(cur_line) > 0:
                         # command_history = []
                         # cur_history_index = 0
-                        mav_serialport.write(cur_line + '\n')
+                        mav_serialport.serial_write(cur_line + '\n')
                         cur_line = ''
 
                     else:
@@ -52,7 +55,6 @@ def live_shell(mav_serialport):
                                                       mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
                 next_heartbeat_time = heartbeat_time + 1
 
-
     except serial.serialutil.SerialException as e:
         print(e)
 
@@ -62,194 +64,132 @@ def live_shell(mav_serialport):
     read_th.join()
 
 
-# MavlinkSerialPort 객체에 시리얼 연결을 수행하여 반환
-# @input: -
-# @output: MavlinkSerialPort
-# require: PX4 기기와 사용자 PC가 연결되어 있어야 함
-def SerialPort():
-    # 시리얼 포트 자동 detect
-    serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',
-                                                             "*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*",
-                                                             '*PX4*', '*FMU*', '*PX*'])
+# ftp 관련 함수들
 
-    for item in serial_list:
-        print(item)
+# opcodes
+TerminateSession = 1
+OpenFileRO = 4
+ReadFile = 5
+BurstReadFile = 15
+# 전역변수
+global mav_msg
+global filesize
+global updated
 
-    if len(serial_list) == 0:
-        print("Error: no serial connection found")
-        return
+msg_buf = []
 
-    if len(serial_list) > 1:
-        print('Auto-detected serial ports are:')
-        for port in serial_list:
-            print(" {:}".format(port))
+#
+#
+#
+def read_thread(mav_serialport, filename):
+    global mav_msg
+    global filesize
+    global updated
 
-    print('Using port {:}'.format(serial_list[0]))
-    port = serial_list[0].device
+    file = filename.split('/')[-1]
+    f = open(file, 'wb')
 
-    print("Connecting to MAVLINK...")
-    try:
-        mav_serialport = MavlinkSerialPort(port, baudrate=115200, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
-        mav_serialport.write('\n')  # make sure the shell is started
-        while True:
-            data = mav_serialport.read(4096)
-            if data and len(data) > 0:
-                if data.find('nsh>') != -1:
-                    break
-        print('PX4 connect complete')
-    except KeyboardInterrupt:
-        print('Aborting')
-
-    return mav_serialport
-
-
-# PX4 기체에 명령어 전송
-# @input:
-#   param: 전송할 명령어
-#   mav_serialport: serial에 연결된 MAVlinkSerialPort 객체
-# @output: 명령어 실행 후 Shell message
-# require: PX4 기기와 사용자 PC가 연결되어 있어야 함
-
-def command(param, mav_serialport):
-    mav_serialport.write(param)
-    ret = ''
     while True:
-        data = mav_serialport.read(4096)
-        if data and len(data) > 0:
-
-            if data.find('nsh>') != -1:
-                # nsh> 제거
-                data = data[:data.find('nsh>')]
-                # 줄바꿈 제거
-                ret += data
-                ret = ret[:-1]
+        if filesize == -1:
+            break
+        d = mav_serialport.ftp_read(4096)
+        if d and len(d) > 0:
+            mav_msg = d
+            print(mav_msg)
+            updated = 1
+            if mav_msg['opcode'] == 129 and mav_msg['data'][0] == 6:
+                f.close()
                 break
-            ret += data
+            if mav_msg['req_opcode'] == 15:
+                for c in mav_msg['data']:
+                    f.write(c.to_bytes(1, byteorder='little'))
 
-    return ret
+# 파일명으로 Drone의 파일을 ftp 전송받는 함수
+# @input: filename(ex. /fs/microse/dataman), MavlinkPort
+# @output: file
+# require: PX4 기기와 사용자 PC가 연결되어 있어야 함
+def get_file_by_name(filename, mav_serialport):
+    global mav_msg
+    global filesize
+    global updated
 
-datalist = []
-filelist = []
-folderlist = []
-#오류, 혹은 사용되지 않는 디렉토리 및 파일
-blacklist = [' group/'] #
+    filesize = 0
 
-#command 실행 함수
-def cmd_ls(mav_serialport):
-    global datalist
-    cmd = "ls\n"
-    data = command(cmd, mav_serialport)
+    # FTP 프로토콜
+    mav_msg = {
+        'seq_number': 0,
+        'session': 0,
+        'opcode': 0,
+        'size': 0,
+        'req_opcode': 0,
+        'burst_complete': 0,
+        'offset': 0,
+        'data': []
+    }
 
-    if data.find("nsh:") != -1: # 오류 메시지 출력 
-        print(data)
-    datalist = data.split('\n')
+    try:
+        # Drone -> GCS로 보내는 MAVLink Shell Message 받는 작업을 하는 스레드 생성
+        read_th = Thread(target=read_thread, args=(mav_serialport, filename))
+        read_th.start()
 
+        # OpenFile 메시지 전송 후 파일 크기 받아옴
+        mav_serialport.ftp_write(opcode=OpenFileRO, data=filename, size=len(filename))
+        total_size = 0
+        offset = 0
 
-def cmd_cd(param, mav_serialport):
-    cmd = "cd " + param.replace("/", "") + "\n"
-    print("cmd :", cmd)
-    data = command(cmd, mav_serialport)
-
-    if data.find("nsh:") != -1: # 오류 메시지 출력 
-        print("error: ", data)
-        cmd_ls(mav_serialport)
-        for item in datalist:
-            print(item)
-        datalist.clear()
-        return 1
-
-    return 0
-    
-    
-def cmd_cd_back(mav_serialport):
-    cmd = "cd ..\n"
-    command(cmd, mav_serialport)
-
-
-# 트리 노드 생성
-class Node:
-    def __init__(self, data):
-        self.data = data
-        self.child = []
-        self.parent = None
-
-    def append_child(self, new_node):
-        new_node.parent = self
-        self.child.append(new_node)
-
-class Tree:
-    def __init__(self, mav_serialport):
-        self.stack = []
-        self.files = []
-        self.mav_serialport = mav_serialport
-        self.root = Node("/")
-
-    # ls
-    def dfs(self, root):
-        self.stack.append(root)
-        self.root.data = root
-        cur = self.root
-        while len(self.stack) != 0:
-            print(self.stack)
-            print("cur: ", cur.data)
-            item = self.stack.pop()
-            print("cur: ",cur.data)
-
-            #print(item)
-                
-            if item == "..":
-                if(len(self.stack) == 1 ): 
-                    break
-                cmd_cd_back(self.mav_serialport)
-                if cur.data != '/':
-                    cur = cur.parent
+        while mav_msg['opcode'] != 128:
+            if mav_msg['opcode'] == 129:
+                print("파일을 불러오는데 실패하였습니다.")
+                filesize = -1
+                return
+            else:
                 continue
 
-            elif "/" in item and item not in blacklist:
-                cmd_cd(item, self.mav_serialport)
-                self.stack.append("..")
-                cmd_ls(self.mav_serialport)
-                for next in cur.child:
-                    print("next: ", next.data,"itm: ", item)
-                    if next.data == item:
-                        cur = next
-                        break
+        for i in range(4):
+            total_size += mav_msg['data'][i] * pow(256, i)
+        filesize = total_size
+
+        if total_size - offset > 230:
+            read_size = 230
+        elif total_size - offset == 0:
+            read_size = 1
+        else:
+            read_size = total_size - offset
+
+        # 파일 전송 요청
+        mav_serialport.ftp_write(opcode=BurstReadFile, session=mav_msg['session'], size=read_size, offset=offset,
+                             seq_number=mav_msg['seq_number'])
+
+        while True:
+            # 파일 전송이 끝났을 시 요청 멈춤
+            if mav_msg['opcode'] == 129 and mav_msg['data'][0] == 6:
+                break
+            next_seq = mav_msg['seq_number']
+            next_offset = mav_msg['offset'] + mav_msg['size']
+
+            # 한 burst가 끝났지만 전송 완료되지 않았을 때 다음 전송 요청
+            if mav_msg['burst_complete'] == 1 and next_offset < filesize:
+                mav_serialport.ftp_write(opcode=TerminateSession, seq_number=mav_msg['seq_number'])
+                mav_serialport.ftp_write(opcode=OpenFileRO, data=filename, size=len(filename))
+
+                mav_serialport.ftp_write(opcode=BurstReadFile, session=mav_msg['session'], size=read_size,
+                                     offset=next_offset, seq_number=next_seq)
+                time.sleep(3)
+
+        mav_serialport.ftp_write(opcode=TerminateSession, seq_number=mav_msg['seq_number'])
+
+    except serial.serialutil.SerialException as e:
+        print(e)
+
+    except KeyboardInterrupt:
+        read_th.join()
+        mav_serialport.ftp_close()
+
+    read_th.join()
+    mav_serialport.ftp_close()
 
 
-            if(len(datalist) != 0):
-                for idx, item in enumerate(datalist):
-                    if idx < 2:
-                        continue
-                    self.stack.append(item)
 
-                    leaf = Node(item)
-                    cur.append_child(leaf)
-
-            datalist.clear()
-
-    # 구성된 트리를 dfs 탐색하는 함수
-    def search(self):
-        st = []
-        st.append(self.root)
-
-        while len(st) > 0:
-            item = st.pop()
-            for sub in item.child:
-                filename = ''
-                cur = sub
-                if cur.data.find('/') == -1:
-                    while cur.parent != None:
-                        filename = cur.data.replace(" ", "") + filename
-                        cur = cur.parent
-
-                    # root 경로 추가
-                    filename = '/'+filename
-
-                    # 여기서 각 파일의 경로+파일명이 생성됩니다
-                    print(filename)
-
-                st.append(sub)
-        
 def main():
 
     # MAVLink 포트 연결
@@ -259,8 +199,9 @@ def main():
     ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
     cur_line = ''
 
+    get_file_by_name('/fs/microsd/dataman', mav_serialport)
     # 실시간으로 Shell 사용할시
-    #live_shell(mav_serialport)
+    live_shell(mav_serialport)
 
     root = "/"
     tree = Tree(mav_serialport)
