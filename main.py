@@ -6,6 +6,7 @@ from threading import Thread
 from src.tools import SerialPort
 from PX4Forensic.src.tree import Tree
 import time
+from src.MavPort import MavlinkPort
 import sys
 
 fd_in = sys.stdin.fileno()
