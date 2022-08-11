@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import os
 from pymavlink import mavutil
 from threading import Thread
-from src.MavSerialPort import MavlinkSerialPort
+from src.MavPort import MavlinkPort
 import sys
 
 fd_in = sys.stdin.fileno()
