@@ -2,31 +2,32 @@ from pymavlink import mavutil
 from src.MavPort import MavlinkPort
 
 
-
 # MavlinkSerialPort 객체에 시리얼 연결을 수행하여 반환
 # @input: -
 # @output: MavlinkSerialPort
 # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
-def SerialPort():
-    # 시리얼 포트 자동 detect
-    serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',
-                                                             "*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*",
-                                                             '*PX4*', '*FMU*', '*PX*'])
+def SerialPort(port='auto'):
 
-    for item in serial_list:
-        print(item)
+    if port == 'auto':
+        # 시리얼 포트 자동 detect
+        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',
+                                                                 "*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*",
+                                                                 '*PX4*', '*FMU*', '*PX*'])
 
-    if len(serial_list) == 0:
-        print("Error: no serial connection found")
-        return
+        for item in serial_list:
+            print(item)
 
-    if len(serial_list) > 1:
-        print('Auto-detected serial ports are:')
-        for port in serial_list:
-            print(" {:}".format(port))
+        if len(serial_list) == 0:
+            print("Error: no serial connection found")
+            return
 
-    print('Using port {:}'.format(serial_list[0]))
-    port = serial_list[0].device
+        if len(serial_list) > 1:
+            print('Auto-detected serial ports are:')
+            for port in serial_list:
+                print(" {:}".format(port))
+
+        print('Using port {:}'.format(serial_list[0]))
+        port = serial_list[0].device
 
     print("Connecting to MAVLINK...")
     try:
@@ -70,11 +71,8 @@ def command(param, mav_serialport):
     return ret
 
 
-datalist = []
 filelist = []
 folderlist = []
-# 오류, 혹은 사용되지 않는 디렉토리 및 파일
-blacklist = [' group/']  #
 
 
 # command 실행 함수
@@ -86,11 +84,11 @@ def cmd_ls(mav_serialport):
     if data.find("nsh:") != -1:  # 오류 메시지 출력
         print(data)
     datalist = data.split('\n')
+    return datalist
 
 
 def cmd_cd(param, mav_serialport):
     cmd = "cd " + param.replace("/", "") + "\n"
-    print("cmd :", cmd)
     data = command(cmd, mav_serialport)
 
     if data.find("nsh:") != -1:  # 오류 메시지 출력

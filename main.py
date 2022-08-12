@@ -4,7 +4,7 @@ import os
 from pymavlink import mavutil
 from threading import Thread
 from src.tools import SerialPort
-from PX4Forensic.src.tree import Tree
+from src.tree import Tree
 import time
 from src.MavPort import MavlinkPort
 import sys
@@ -65,7 +65,40 @@ def live_shell(mav_serialport):
     read_th.join()
 
 
+# 구성된 트리를 dfs 탐색하는 함수
+# @input: root: 탐색할 트리의 루트 노드
+# @output: -
+# description:
+def search(root):
+    st = []
+    st.append(root)
+
+    while len(st) > 0:
+        item = st.pop()
+        for sub in item.child:
+            filename = ''
+            cur = sub
+
+            # 현재 노드가 파일일 경우
+            if cur.data.find('/') == -1:
+                while cur.parent != None:
+                    filename = cur.data.replace(" ", "") + filename
+                    cur = cur.parent
+
+                # root 경로 추가
+                filename = '/' + filename
+
+                ###################################################
+                # 여기서 각 파일의 경로+파일명이 생성됩니다
+                # 각 파일에 접근하실거면 이쪽 영역을 수정하시면 됩니다.
+
+                print(filename)
+                ###################################################
+
+            st.append(sub)
+
 # ftp 관련 함수들
+
 
 # opcodes
 TerminateSession = 1
@@ -79,9 +112,9 @@ global updated
 
 msg_buf = []
 
-#
-#
-#
+
+# ftp 파일을 받아올 때 쓸 멀티스레딩 함수
+# 딱히 건드릴 필요 없음
 def read_thread(mav_serialport, filename):
     global mav_msg
     global filesize
@@ -194,22 +227,26 @@ def get_file_by_name(filename, mav_serialport):
 def main():
 
     # MAVLink 포트 연결
-    mav_serialport = SerialPort()
+    # 보통 자동 감지하나 안되는 경우에는 수동으로 파라미터 넣어서 포트명 변경해주세요
+    #mav_serialport = SerialPort()
+    mav_serialport = SerialPort('COM3')
 
     fd_in = sys.stdin.fileno()
     ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
     cur_line = ''
 
-    get_file_by_name('/fs/microsd/dataman', mav_serialport)
+    #get_file_by_name('/fs/microsd/dataman', mav_serialport)
     # 실시간으로 Shell 사용할시
-    live_shell(mav_serialport)
+    #live_shell(mav_serialport)
 
     root = "/"
     tree = Tree(mav_serialport)
 
     while len(tree.stack) == 0:
         tree.dfs(root)
-    tree.search()
+        tree_root = tree.get_root()
+        search(tree_root)
+
     # while True:
     #     cmd = ubuf_stdin.readline().decode('utf8')
     #     data = command(cmd, mav_serialport)

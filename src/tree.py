@@ -1,4 +1,4 @@
-from PX4Forensic.src.tools import cmd_cd, cmd_ls
+from src.tools import cmd_cd, cmd_ls, cmd_cd_back
 
 # 트리 노드 생성
 class Node:
@@ -19,21 +19,23 @@ class Tree:
         self.mav_serialport = mav_serialport
         self.root = Node("/")
 
-    # ls
+    # mav_serialport에 연결된 드론의 쉘 커맨드를 이용해 파일 목록을 불러오는 함수
+    # @input: root 노드
+    # @output: 드론의 파일/폴더를 노드로 하는 트리
     def dfs(self, root):
+        # 오류, 혹은 사용되지 않는 디렉토리 및 파일
+        blacklist = [' group/']
+        datalist =[]
         self.stack.append(root)
         self.root.data = root
         cur = self.root
         while len(self.stack) != 0:
-            print(self.stack)
-            print("cur: ", cur.data)
             item = self.stack.pop()
-            print("cur: ", cur.data)
 
             # print(item)
 
             if item == "..":
-                if (len(self.stack) == 1):
+                if len(self.stack) == 1:
                     break
                 cmd_cd_back(self.mav_serialport)
                 if cur.data != '/':
@@ -43,14 +45,13 @@ class Tree:
             elif "/" in item and item not in blacklist:
                 cmd_cd(item, self.mav_serialport)
                 self.stack.append("..")
-                cmd_ls(self.mav_serialport)
+                datalist = cmd_ls(self.mav_serialport)
                 for next in cur.child:
-                    print("next: ", next.data, "itm: ", item)
                     if next.data == item:
                         cur = next
                         break
 
-            if (len(datalist) != 0):
+            if len(datalist) != 0:
                 for idx, item in enumerate(datalist):
                     if idx < 2:
                         continue
@@ -61,25 +62,7 @@ class Tree:
 
             datalist.clear()
 
-    # 구성된 트리를 dfs 탐색하는 함수
-    def search(self):
-        st = []
-        st.append(self.root)
+    def get_root(self):
+        return self.root
 
-        while len(st) > 0:
-            item = st.pop()
-            for sub in item.child:
-                filename = ''
-                cur = sub
-                if cur.data.find('/') == -1:
-                    while cur.parent != None:
-                        filename = cur.data.replace(" ", "") + filename
-                        cur = cur.parent
 
-                    # root 경로 추가
-                    filename = '/' + filename
-
-                    # 여기서 각 파일의 경로+파일명이 생성됩니다
-                    print(filename)
-
-                st.append(sub)
