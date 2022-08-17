@@ -114,9 +114,6 @@ class MavlinkPort:
         payload.extend([0] * (251 - len(payload)))
         self.mav.mav.file_transfer_protocol_send(0, 0, 0, payload)
 
-    def ftp_close(self):
-        self.mav.mav.serial_control_send(self.port, 0, 0, 0, 0, [0]*70)
-
     def ftp_recv(self):
         # read some bytes into self.buf
         m = self.mav.recv_match(type='FILE_TRANSFER_PROTOCOL', blocking=True,
@@ -150,3 +147,5 @@ class MavlinkPort:
             return ret
         return []
 
+    def close(self):
+        self.mav.mav.serial_control_send(self.port, 0, 0, 0, 0, [0] * 70)
