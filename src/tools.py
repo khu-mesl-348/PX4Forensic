@@ -88,6 +88,12 @@ def cmd_ls(mav_serialport):
 
 
 def cmd_cd(param, mav_serialport):
+    if " " in param: # '/'를 ''로 만들어버리는 것 방지
+        param = param[1:] # 첫 글자 제거(예: ' proc/' -> 'proc/')
+    
+    if " " in param: # 그럼에도 띄어쓰기 있는 경우
+        param = "\"" + param + "\"" # 큰 따옴표로 묶음(예: 'Simple code/' -> '"Simple code/"')
+    
     cmd = "cd " + param.replace("/", "") + "\n"
     data = command(cmd, mav_serialport)
 
