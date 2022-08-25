@@ -69,7 +69,7 @@ def live_shell(mav_serialport):
 # @input: root: 탐색할 트리의 루트 노드
 # @output: -
 # description:
-def search(root, mav_serialport):
+def search(root):
     st = []
     st.append(root)
 
@@ -88,17 +88,6 @@ def search(root, mav_serialport):
                 # root 경로 추가
                 filename = '/' + filename
 
-                # # 부모 노드가 루트 폴더가 아닌 경우 진입
-                # if item != root:
-                #     # 디렉토리가 존재하지 않으면,
-                #     if not os.path.exists(item):
-                #         # 해당 디렉토리 생성하고, 거기로 위치 이동
-                #         os.makedirs(item)
-                #         os.chdir(item)
-                      
-                # 해당 디렉토리에 파일 받기
-                get_file_by_name(filename, mav_serialport)
-                
                 ###################################################
                 # 여기서 각 파일의 경로+파일명이 생성됩니다
                 # 각 파일에 접근하실거면 이쪽 영역을 수정하시면 됩니다.
@@ -107,6 +96,7 @@ def search(root, mav_serialport):
                 ###################################################
 
             st.append(sub)
+
 
 # ftp 관련 함수들
 
@@ -148,6 +138,7 @@ def read_thread(mav_serialport, filename):
             if mav_msg['req_opcode'] == 15:
                 for c in mav_msg['data']:
                     f.write(c.to_bytes(1, byteorder='little'))
+
 
 # 파일명으로 Drone의 파일을 ftp 전송받는 함수
 # @input: filename(ex. /fs/microse/dataman), MavlinkPort
@@ -203,7 +194,7 @@ def get_file_by_name(filename, mav_serialport):
 
         # 파일 전송 요청
         mav_serialport.ftp_write(opcode=BurstReadFile, session=mav_msg['session'], size=read_size, offset=offset,
-                             seq_number=mav_msg['seq_number'])
+                                 seq_number=mav_msg['seq_number'])
 
         while True:
             # 파일 전송이 끝났을 시 요청 멈춤
@@ -218,37 +209,35 @@ def get_file_by_name(filename, mav_serialport):
                 mav_serialport.ftp_write(opcode=OpenFileRO, data=filename, size=len(filename))
 
                 mav_serialport.ftp_write(opcode=BurstReadFile, session=mav_msg['session'], size=read_size,
-                                     offset=next_offset, seq_number=next_seq)
+                                         offset=next_offset, seq_number=next_seq)
                 time.sleep(3)
 
-        mav_serialport.ftp_write(opcode=TerminateSession, seq_number=mav_msg['seq_number'])
+
 
     except serial.serialutil.SerialException as e:
         print(e)
 
     except KeyboardInterrupt:
         read_th.join()
-        mav_serialport.ftp_close()
+        mav_serialport.ftp_close(mav_msg['seq_number'])
 
     read_th.join()
-    mav_serialport.ftp_close()
-
+    mav_serialport.ftp_close(mav_msg['seq_number'])
 
 
 def main():
-
     # MAVLink 포트 연결
     # 보통 자동 감지하나 안되는 경우에는 수동으로 파라미터 넣어서 포트명 변경해주세요
-    #mav_serialport = SerialPort()
+    # mav_serialport = SerialPort()
     mav_serialport = SerialPort('COM3')
 
     fd_in = sys.stdin.fileno()
     ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
     cur_line = ''
 
-    #get_file_by_name('/fs/microsd/dataman', mav_serialport)
+    # get_file_by_name('/fs/microsd/dataman', mav_serialport)
     # 실시간으로 Shell 사용할시
-    #live_shell(mav_serialport)
+    # live_shell(mav_serialport)
 
     root = "/"
     tree = Tree(mav_serialport)
@@ -256,14 +245,16 @@ def main():
     while len(tree.stack) == 0:
         tree.dfs(root)
         tree_root = tree.get_root()
-        search(tree_root, mav_serialport)
+        search(tree_root)
 
+    get_file_by_name("/fs/microsd/dataman", mav_serialport)
     # while True:
     #     cmd = ubuf_stdin.readline().decode('utf8')
     #     data = command(cmd, mav_serialport)
     #     print(data)
-        
+
     mav_serialport.close()
+
 
 if __name__ == '__main__':
     main()
