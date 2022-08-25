@@ -151,4 +151,4 @@ class MavlinkPort:
         self.mav.mav.serial_control_send(self.port, 0, 0, 0, 0, [0] * 70)
 
     def ftp_close(self, seq_num):
-        self.ftp_write(opcode=1, seq_num)
+        self.ftp_write(opcode=1, seq_number=seq_num)
