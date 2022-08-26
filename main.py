@@ -73,32 +73,45 @@ def search(root, mav_serialport):
     st = []
     st.append(root)
 
+    root_path = os.getcwd()
+    
     while len(st) > 0:
         item = st.pop()
+        
+        # item = 부모 노드
+        # item이 디렉토리면, chdir(item.data)
+        # item이 파일이면, 아래 과정 무시
+        
+        if item != root:
+            if item.data.find('/') != -1:
+                while(not os.path.exists(item.data)):
+                    os.chdir("..")
+                os.chdir(item.data)
+                
+                    
         for sub in item.child:
+            
+            # sub = 자식 노드
+            # sub이 디렉토리면, mkdir(sub.data)
+            # sub이 파일이면, 파일 생성
+
             filename = ''
             cur = sub
-            print(cur.data)
-
             # 현재 노드가 파일일 경우
             if cur.data.find('/') == -1:
                 while cur.parent != None:
                     filename = cur.data.replace(" ", "") + filename
                     cur = cur.parent
-
                 # root 경로 추가
-                filename = '/' + filename
-
-                # 부모 노드가 루트 폴더가 아닌 경우 진입
-                if item != root:
-                    # 디렉토리가 존재하지 않으면,
-                    if not os.path.exists(item):
-                        # 해당 디렉토리 생성하고, 거기로 위치 이동
-                        os.makedirs(item)
-                        os.chdir(item)
-                
+                filename = '/' + filename  
                 # 해당 디렉토리에 파일 받기
                 get_file_by_name(filename, mav_serialport)
+                print(filename)
+                
+            else:
+                os.makedirs(sub.data)
+
+            st.append(sub)
 
 
 # ftp 관련 함수들
@@ -291,8 +304,8 @@ def main():
 
     while len(tree.stack) == 0:
         tree.dfs(root)
-        #tree_root = tree.get_root()
-        #search(tree_root, mav_serialport)
+        tree_root = tree.get_root()
+        search(tree_root, mav_serialport)
 
     res = 0
 
