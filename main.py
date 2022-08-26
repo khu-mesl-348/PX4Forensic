@@ -88,6 +88,26 @@ def search(root):
                 # root 경로 추가
                 filename = '/' + filename
 
+<<<<<<< HEAD
+=======
+                # 부모 노드가 루트 폴더가 아닌 경우 진입
+                if item != root:
+                    # 디렉토리가 존재하지 않으면,
+                    if not os.path.exists(item):
+                        # 해당 디렉토리 생성하고, 거기로 위치 이동
+                        os.makedirs(item)
+                        os.chdir(item)
+                
+                '''
+                부모 노드가 루트 폴더인 경우엔 위 과정 무시.
+                예를 들어 루트 폴더에 존재하는 파일(/example.txt)인 경우
+                그냥 main.py가 위치한 디렉토리에 받으면 되기 때문.
+                '''
+                      
+                # 해당 디렉토리에 파일 받기
+                get_file_by_name(filename, mav_serialport)
+                
+>>>>>>> parent of c2a1397 (Modify function 'search')
                 ###################################################
                 # 여기서 각 파일의 경로+파일명이 생성됩니다
                 # 각 파일에 접근하실거면 이쪽 영역을 수정하시면 됩니다.
