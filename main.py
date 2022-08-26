@@ -81,7 +81,7 @@ def search(root, mav_serialport):
         # item = 부모 노드
         # item이 디렉토리면, chdir(item.data)
         # item이 파일이면, 아래 과정 무시
-        
+
         if item != root:
             if item.data.find('/') != -1:
                 while(not os.path.exists(item.data)):
@@ -90,26 +90,41 @@ def search(root, mav_serialport):
                 
                     
         for sub in item.child:
-            
+            print(sub.data)
             # sub = 자식 노드
             # sub이 디렉토리면, mkdir(sub.data)
             # sub이 파일이면, 파일 생성
 
-            filename = ''
+
             cur = sub
+            filename = ""
             # 현재 노드가 파일일 경우
             if cur.data.find('/') == -1:
                 while cur.parent != None:
-                    filename = cur.data.replace(" ", "") + filename
+                    filename = cur.data + filename
                     cur = cur.parent
                 # root 경로 추가
                 filename = '/' + filename  
                 # 해당 디렉토리에 파일 받기
-                get_file_by_name(filename, mav_serialport)
+                print(filename)
+                while True:
+                    res = get_file_by_name(filename, mav_serialport)
+                    if res != 1:
+                        print("재요청중...")
+                        mav_serialport.ftp_close(seq_num=0)
+                    else:
+                        break
+
                 print(filename)
                 
             else:
-                os.makedirs(sub.data)
+                try:
+                    foldername = sub.data
+                    while foldername[0] == " ":
+                        foldername = foldername[1:]
+                    os.makedirs(foldername)
+                except FileExistsError:
+                    pass
 
             st.append(sub)
 
@@ -124,71 +139,17 @@ OpenFileRO = 4
 ReadFile = 5
 BurstReadFile = 15
 # 전역변수
-global mav_msg
 global filesize
 global updated
 global timeout
 
 msg_buf = []
 
-
-# ftp 파일을 받아올 때 쓸 멀티스레딩 함수
-# 딱히 건드릴 필요 없음
-def read_thread(mav_serialport, filename):
-    global mav_msg
-    global filesize
-    global updated
-    global timeout
-
-    file = filename.split('/')[-1]
-    f = open(file, 'wb')
-
-    cur_time = time.time()
-    last_time = time.time()
-    temp_time =0
-
-    while True:
-        if filesize == -1:
-            break
-
-        if cur_time-last_time > 30:
-            print(cur_time - last_time)
-            timeout = 1
-            break
-        cur_time = time.time()
-        d = mav_serialport.ftp_read(4096)
-
-        # 막혔을시 재전송
-        if round(cur_time) != temp_time :
-            print(f"progress: {mav_msg['offset']} / {filesize}, time: {round(cur_time)}\n")
-            temp_time = round(cur_time)
-
-        if d and len(d) > 0:
-            last_time = time.time()
-            mav_msg = d
-
-            #print(mav_msg)
-            updated = 1
-            if mav_msg['opcode'] == 129 and mav_msg['data'][0] == 6:
-                f.close()
-                break
-            elif mav_msg['opcode'] == 129:
-                print(mav_msg)
-            if mav_msg['req_opcode'] == ReadFile:
-                for c in mav_msg['data']:
-                    f.write(c.to_bytes(1, byteorder='little'))
-
-
-
-
-
-
 # 파일명으로 Drone의 파일을 ftp 전송받는 함수
 # @input: filename(ex. /fs/microse/dataman), MavlinkPort
 # @output: file
 # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
 def get_file_by_name(filename, mav_serialport):
-    global mav_msg
     global filesize
     global updated
     global timeout
@@ -211,6 +172,10 @@ def get_file_by_name(filename, mav_serialport):
         # read_th = Thread(target=read_thread, args=(mav_serialport, filename))
         # read_th.start()
 
+        file = filename.split('/')[-1]
+        print(file)
+        if file[0] == '.':
+            return 1
         res = 1
         # OpenFile 메시지 전송 후 파일 크기 받아옴
         mav_serialport.ftp_write(opcode=OpenFileRO, data=filename, size=len(filename))
@@ -218,26 +183,39 @@ def get_file_by_name(filename, mav_serialport):
         offset = 0
         timeout = 0
 
-        file = filename.split('/')[-1]
-        f = open(file, 'wb')
 
+
+        f = open(file, 'wb')
+        print(filename, "===============")
         while True:
             d = mav_serialport.ftp_read(4096)
 
             if d and len(d) > 0:
-                if mav_msg['opcode'] == 129:
-                    print(mav_msg)
+                print(d)
+                if d['opcode'] == 129:
+                    if d['data'][0] == 2:
+                        if d['data'][1] == 13:
+                            print("Permission denied")
+                            return 1
+                            break
+
                     print("파일을 불러오는데 실패하였습니다.")
-                    filesize = -1
+                    return -1
                     break
 
                 else:
                     mav_msg = d
                     break
-
-        for i in range(4):
-            total_size += mav_msg['data'][i] * pow(256, i)
-        filesize = total_size
+        print(mav_msg)
+        if len(mav_msg['data']) == 4:
+            for i in range(4):
+                total_size += mav_msg['data'][i] * pow(256, i)
+            filesize = total_size
+        else:
+            print("잘못된 응답입니다.")
+            mav_serialport.ftp_close(mav_msg['seq_number'])
+            f.close()
+            return -1
 
         if total_size - offset > 230:
             read_size = 230
@@ -248,10 +226,12 @@ def get_file_by_name(filename, mav_serialport):
 
         # 파일 전송 요청
         while True:
+
             cur_seq = mav_msg['seq_number']
             mav_serialport.ftp_write(opcode=ReadFile, session=mav_msg['session'], size=read_size, offset=offset, seq_number=mav_msg['seq_number'])
 
             while True:
+                print(f"{filename}: {offset} of {total_size}")
                 d = mav_serialport.ftp_read(4096)
 
                 if d and len(d) > 0:
@@ -259,16 +239,23 @@ def get_file_by_name(filename, mav_serialport):
                     mav_msg = d
                     break
 
-            print(mav_msg)
-            if mav_msg['opcode'] == 129 and mav_msg['data'][0] == 6:
-                f.close()
-                res = 1
-                break
-            elif mav_msg['opcode'] == 129:
-                print(mav_msg)
-                print("파일을 불러오는 도중 오류가 발생하였습니다..")
-                res = -1
-                break
+            #print(mav_msg)
+            if mav_msg['opcode'] == 129:
+                if mav_msg['data'][0] == 6:
+                    f.close()
+                    res = 1
+                    break
+
+                if mav_msg['data'][0] == 2:
+                    if mav_msg['data'][1] == 13:
+                        print("Permission denied")
+                        res = 1
+                        break
+                else:
+                    print(mav_msg)
+                    print("파일을 불러오는 도중 오류가 발생하였습니다..")
+                    res = -1
+                    break
             else:
                 for c in mav_msg['data']:
                     f.write(c.to_bytes(1, byteorder='little'))
@@ -280,8 +267,23 @@ def get_file_by_name(filename, mav_serialport):
 
     except KeyboardInterrupt:
         mav_serialport.ftp_close(mav_msg['seq_number'])
+        f.close()
 
-    mav_serialport.ftp_close(mav_msg['seq_number'])
+    mav_serialport.ftp_close(seq_num=mav_msg['seq_number'])
+
+    while True:
+        d = mav_serialport.ftp_read(4096)
+
+        if d and len(d) > 0:
+            if mav_msg['opcode'] == 129 or mav_msg['opcode'] == 128:
+                print(mav_msg)
+                filesize = -1
+                break
+
+            else:
+                mav_msg = d
+                break
+
     return res
 
 
@@ -309,13 +311,7 @@ def main():
 
     res = 0
 
-    while True:
-        res = get_file_by_name("/etc/extras/actuators.json.xz", mav_serialport)
-        if res != 1:
-            print("재요청중...")
-            mav_serialport.ftp_close(seq_num=-1)
-        else:
-            break
+
     # while True:
     #     cmd = ubuf_stdin.readline().decode('utf8')
     #     data = command(cmd, mav_serialport)

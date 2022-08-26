@@ -1,4 +1,4 @@
-from src.tools import cmd_cd, cmd_ls, cmd_cd_back
+from src.tools import cmd_cd, cmd_ls, cmd_cd_back,command
 
 # 트리 노드 생성
 class Node:
@@ -24,7 +24,7 @@ class Tree:
     # @output: 드론의 파일/폴더를 노드로 하는 트리
     def dfs(self, root):
         # 오류, 혹은 사용되지 않는 디렉토리 및 파일
-        blacklist = [' group/']
+        blacklist = ['group/']
         datalist =[]
         self.stack.append(root)
         self.root.data = root
@@ -56,7 +56,6 @@ class Tree:
                     if idx < 2:
                         continue
                     self.stack.append(item)
-
                     leaf = Node(item)
                     cur.append_child(leaf)
 
