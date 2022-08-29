@@ -21,6 +21,7 @@ PASS = -2
 RELOAD = -1
 SUCCESS = 0
 FailErrno = 2
+SessionNotFound = 4
 FileNotFound = 10
 
 # nuttx errno
@@ -149,7 +150,9 @@ def search(root, mav_serialport):
                         if res[1] == EACCES:
                             search_result.append([filename, 'EACCES'])
                             break
-                    elif res[0] == FileExistsError:
+                    elif res[0] == SessionNotFound:
+                        print("Session not found. reloading...")
+                    elif res[0] == FileNotFound:
                         search_result.append([filename, 'FILEEXISTSERROR'])
                         break
                     else:
@@ -241,6 +244,9 @@ def get_file_by_name(filename, mav_serialport):
                             print("Permission denied")
                             return [FailErrno, EACCES]
 
+                    if d['data'][0] == SessionNotFound:
+                        print('session not found')
+                        return [SessionNotFound]
                     if d['data'][0] == 10: # 파일이 존재하지 않을 시
                         print("File not found")
                         return [FileNotFound]
