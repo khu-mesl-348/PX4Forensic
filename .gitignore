@@ -1,3 +1,11 @@
 node_modules/
 package.json
 package-lock.json
+bin/
+dev/
+etc/
+fs/
+proc/
+obj/
+.idea/
+__pycache__/
