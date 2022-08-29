@@ -29,6 +29,7 @@ class Tree:
         self.stack.append(root)
         self.root.data = root
         cur = self.root
+        cmd_cd("/", self.mav_serialport)
         while len(self.stack) != 0:
             item = self.stack.pop()
 

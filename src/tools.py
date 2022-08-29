@@ -41,6 +41,9 @@ def SerialPort(port='auto'):
         print('PX4 connect complete')
     except KeyboardInterrupt:
         print('Aborting')
+        return
+
+
 
     return mav_serialport
 

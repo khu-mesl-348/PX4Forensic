@@ -9,6 +9,24 @@ import time
 from src.MavPort import MavlinkPort
 import sys
 
+# opcodes
+TerminateSession = 1
+ResetSession = 2
+OpenFileRO = 4
+ReadFile = 5
+BurstReadFile = 15
+
+# nak err info
+PASS = -2
+RELOAD = -1
+SUCCESS = 0
+FailErrno = 2
+FileNotFound = 10
+
+# nuttx errno
+EACCES = 2
+
+
 fd_in = sys.stdin.fileno()
 ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
 
@@ -18,15 +36,18 @@ ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
 # @output: -
 # require: -
 def live_shell(mav_serialport):
+    cur_line = ''
     # Drone -> GCS로 보내는 MAVLink Shell Message 받을 때 사용.
     def read():
         while True:
             data = mav_serialport.serial_read(4096)
             if data and len(data) > 0:
                 sys.stdout.write(data)
+            if cur_line == "exit":
+                break
 
     try:
-        cur_line = ''
+
         next_heartbeat_time = timer()
 
         # Drone -> GCS로 보내는 MAVLink Shell Message 받는 작업을 하는 스레드 생성
@@ -43,11 +64,18 @@ def live_shell(mav_serialport):
                         # if len(cur_line) > 0:
                         # command_history = []
                         # cur_history_index = 0
+                        if cur_line == "exit":
+                            break
                         mav_serialport.serial_write(cur_line + '\n')
                         cur_line = ''
 
                     else:
                         cur_line += ch
+
+                if cur_line == "exit":
+                    break
+            if cur_line == "exit":
+                break
 
             # handle heartbeat sending
             heartbeat_time = timer()
@@ -71,12 +99,14 @@ def live_shell(mav_serialport):
 # description:
 def search(root, mav_serialport):
     st = []
+    search_result=[]
     st.append(root)
 
     root_path = os.getcwd()
     
     while len(st) > 0:
         item = st.pop()
+        print(item.data)
         
         # item = 부모 노드
         # item이 디렉토리면, chdir(item.data)
@@ -109,9 +139,19 @@ def search(root, mav_serialport):
                 print(filename)
                 while True:
                     res = get_file_by_name(filename, mav_serialport)
-                    if res != 1:
+                    if res[0] == RELOAD:
                         print("재요청중...")
                         mav_serialport.ftp_close(seq_num=0)
+                    elif res[0] == SUCCESS:
+                        search_result.append([filename, 'SUCCESS'])
+                        break
+                    elif res[0] == FailErrno:
+                        if res[1] == EACCES:
+                            search_result.append([filename, 'EACCES'])
+                            break
+                    elif res[0] == FileExistsError:
+                        search_result.append([filename, 'FILEEXISTSERROR'])
+                        break
                     else:
                         break
 
@@ -128,16 +168,12 @@ def search(root, mav_serialport):
 
             st.append(sub)
 
+    return search_result
 
 # ftp 관련 함수들
 
 
-# opcodes
-TerminateSession = 1
-ResetSession = 2
-OpenFileRO = 4
-ReadFile = 5
-BurstReadFile = 15
+
 # 전역변수
 global filesize
 global updated
@@ -172,41 +208,55 @@ def get_file_by_name(filename, mav_serialport):
         # read_th = Thread(target=read_thread, args=(mav_serialport, filename))
         # read_th.start()
 
+        # 버퍼 비우기
+        while True:
+            d = mav_serialport.ftp_read(4096)
+            mav_msg = d
+            if d and len(d) > 0:
+                print(d)
+            else:
+                break
+
+        # 파일 이름 추출
         file = filename.split('/')[-1]
-        print(file)
         if file[0] == '.':
-            return 1
-        res = 1
+            return [PASS]
+
         # OpenFile 메시지 전송 후 파일 크기 받아옴
         mav_serialport.ftp_write(opcode=OpenFileRO, data=filename, size=len(filename))
         total_size = 0
         offset = 0
         timeout = 0
+        print(filename, "\n===============")
 
-
-
-        f = open(file, 'wb')
-        print(filename, "===============")
+        # OpenFile 후 ACK 파싱
         while True:
             d = mav_serialport.ftp_read(4096)
-
             if d and len(d) > 0:
                 print(d)
-                if d['opcode'] == 129:
-                    if d['data'][0] == 2:
-                        if d['data'][1] == 13:
+                if d['opcode'] == 129: # 오류 처리
+                    mav_serialport.ftp_close(seq_num=d['seq_number'])
+                    if d['data'][0] == 2: # 운영체제 사이드에서 오류
+                        if d['data'][1] == 13: # Permission denied
                             print("Permission denied")
-                            return 1
-                            break
+                            return [FailErrno, EACCES]
+
+                    if d['data'][0] == 10: # 파일이 존재하지 않을 시
+                        print("File not found")
+                        return [FileNotFound]
+
 
                     print("파일을 불러오는데 실패하였습니다.")
-                    return -1
+                    return [RELOAD]
                     break
 
                 else:
                     mav_msg = d
                     break
+
         print(mav_msg)
+
+        # OpenFile 성공시 데이터 길이 추출
         if len(mav_msg['data']) == 4:
             for i in range(4):
                 total_size += mav_msg['data'][i] * pow(256, i)
@@ -215,7 +265,7 @@ def get_file_by_name(filename, mav_serialport):
             print("잘못된 응답입니다.")
             mav_serialport.ftp_close(mav_msg['seq_number'])
             f.close()
-            return -1
+            return [RELOAD]
 
         if total_size - offset > 230:
             read_size = 230
@@ -224,9 +274,11 @@ def get_file_by_name(filename, mav_serialport):
         else:
             read_size = total_size - offset
 
+        # 파일 Open
+        f = open(file, 'wb')
+        
         # 파일 전송 요청
         while True:
-
             cur_seq = mav_msg['seq_number']
             mav_serialport.ftp_write(opcode=ReadFile, session=mav_msg['session'], size=read_size, offset=offset, seq_number=mav_msg['seq_number'])
 
@@ -239,24 +291,17 @@ def get_file_by_name(filename, mav_serialport):
                     mav_msg = d
                     break
 
-            #print(mav_msg)
-            if mav_msg['opcode'] == 129:
-                if mav_msg['data'][0] == 6:
+            if mav_msg['opcode'] == 129: # 파일 전송 도중 오류 처리
+                if mav_msg['data'][0] == 6: # 파일 전송 완료
                     f.close()
-                    res = 1
+                    res = [SUCCESS]
                     break
-
-                if mav_msg['data'][0] == 2:
-                    if mav_msg['data'][1] == 13:
-                        print("Permission denied")
-                        res = 1
-                        break
-                else:
+                else: # 다른 오류 발생 시
                     print(mav_msg)
                     print("파일을 불러오는 도중 오류가 발생하였습니다..")
-                    res = -1
+                    res = [RELOAD]
                     break
-            else:
+            else: # 데이터 정상 수신
                 for c in mav_msg['data']:
                     f.write(c.to_bytes(1, byteorder='little'))
 
@@ -269,20 +314,14 @@ def get_file_by_name(filename, mav_serialport):
         mav_serialport.ftp_close(mav_msg['seq_number'])
         f.close()
 
+    # ftp 세션 닫기
     mav_serialport.ftp_close(seq_num=mav_msg['seq_number'])
-
     while True:
         d = mav_serialport.ftp_read(4096)
-
+        mav_msg = d
         if d and len(d) > 0:
-            if mav_msg['opcode'] == 129 or mav_msg['opcode'] == 128:
-                print(mav_msg)
-                filesize = -1
-                break
-
-            else:
-                mav_msg = d
-                break
+            print("terminate: ", d)
+            break
 
     return res
 
@@ -292,31 +331,30 @@ def main():
     # 보통 자동 감지하나 안되는 경우에는 수동으로 파라미터 넣어서 포트명 변경해주세요
     # mav_serialport = SerialPort()
     mav_serialport = SerialPort()
+    if mav_serialport is None:
+        print("시리얼 연결에 오류가 발생하였습니다")
+        return
 
     fd_in = sys.stdin.fileno()
     ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
     cur_line = ''
 
-    # get_file_by_name('/fs/microsd/dataman', mav_serialport)
     # 실시간으로 Shell 사용할시
-    #live_shell(mav_serialport)
+    # live_shell(mav_serialport)
 
     root = "/"
     tree = Tree(mav_serialport)
 
     while len(tree.stack) == 0:
+
         tree.dfs(root)
+
         tree_root = tree.get_root()
-        search(tree_root, mav_serialport)
+        print("len of tree.stack: ",len(tree.stack))
+
+        print(search(tree_root, mav_serialport))
 
     res = 0
-
-
-    # while True:
-    #     cmd = ubuf_stdin.readline().decode('utf8')
-    #     data = command(cmd, mav_serialport)
-    #     print(data)
-
     mav_serialport.close()
 
 
