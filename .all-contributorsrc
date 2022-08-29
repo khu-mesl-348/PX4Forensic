@@ -33,6 +33,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "beerabbit",
+      "name": "icetream",
+      "avatar_url": "https://avatars.githubusercontent.com/u/57741072?v=4",
+      "profile": "https://github.com/beerabbit",
+      "contributions": [
+        "ideas"
+      ]
     }
   ],
   "projectName": "PX4Forensic",
