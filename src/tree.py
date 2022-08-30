@@ -56,7 +56,7 @@ class Tree:
                 for idx, item in enumerate(datalist):
                     if idx < 2:
                         continue
-                    if item.data not in blacklist:
+                    if item not in blacklist:
                         self.stack.append(item)
                         leaf = Node(item)
                         cur.append_child(leaf)
