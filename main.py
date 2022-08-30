@@ -98,7 +98,7 @@ def live_shell(mav_serialport):
 # @input: root: 탐색할 트리의 루트 노드
 # @output: -
 # description:
-def search(root, mav_serialport):
+def copy_data_from_UAV(root, mav_serialport):
     st = []
     search_result=[]
     st.append(root)
@@ -331,6 +331,12 @@ def get_file_by_name(filename, mav_serialport):
 
     return res
 
+# Drone에 파일을 ftp 전송하는 함수
+# @input: filename(ex. /fs/microse/dataman): 드론 상에서의 저장 위치, filepath: 보낼 파일의 경로, MavlinkPort
+# @output: 실행 결과
+# require: PX4 기기와 사용자 PC가 연결되어 있어야 함
+def send_file_by_name(filename, filepath, mav_port):
+
 
 def main():
     # MAVLink 포트 연결
@@ -354,9 +360,8 @@ def main():
     while len(tree.stack) == 0:
         blacklist = ['group/', 'mmcsd0']
         tree.dfs(root, blacklist)
-
         tree_root = tree.get_root()
-        print(search(tree_root, mav_serialport))
+        print(copy_data_from_UAV(tree_root, mav_serialport))
 
     res = 0
     mav_serialport.close()
