@@ -352,12 +352,10 @@ def main():
     tree = Tree(mav_serialport)
 
     while len(tree.stack) == 0:
-
-        tree.dfs(root)
+        blacklist = ['group/', 'mmcsd0']
+        tree.dfs(root, blacklist)
 
         tree_root = tree.get_root()
-        print("len of tree.stack: ",len(tree.stack))
-
         print(search(tree_root, mav_serialport))
 
     res = 0
