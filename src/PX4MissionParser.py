@@ -73,7 +73,7 @@ def dmread(fd, item, index, buf, count):
     if count > (g_per_item_size[item] - DM_SECTOR_HDR_SIZE):
         return -1
     
-    len = -1
+    length = -1
     read_success = 0
     for i in range(2):
         ret_seek = os.lseek(fd, offset, os.SEEK_SET)
@@ -91,6 +91,9 @@ def dmread(fd, item, index, buf, count):
         #print(buffer, count+DM_SECTOR_HDR_SIZE)
         #print(buffer)
         #print("read result: len: %x, count: %x, size: %x\n", len, count+DM_SECTOR_HDR_SIZE,buffer[0]);
+
+        if len(buffer) == 0 :
+            return -1
   
         if buffer[0] >= 0:
             read_success = 1
@@ -98,7 +101,7 @@ def dmread(fd, item, index, buf, count):
         if not read_success:
             return -1
     
-    if len == 0:
+    if length == 0:
         buffer[0] = 0
     
     if buffer[0] > 0:
@@ -187,13 +190,13 @@ def get_safe_points(fd):
     for current_seq in range(1, num_safe_points+1):
         mission_safe_point = mission_safe_point_s(0,0,0,0)
         ret = dmread(fd, dm_item_t.DM_KEY_SAFE_POINTS.value, current_seq, mission_safe_point, dm_size.SAFE_POINTS_SIZE.value)
-        res.append(mission_safe_point)
 
         if ret != dm_size.SAFE_POINTS_SIZE.value:
             print("dm_read failed\n")
             continue
+        res.append(mission_safe_point)
 
-		#printf("ret: %d, size: %ld\n",ret ,sizeof(struct mission_safe_point_s));
+        #printf("ret: %d, size: %ld\n",ret ,sizeof(struct mission_safe_point_s));
         print(f"{current_seq} th point: lat: {mission_safe_point.lat}, lon: {mission_safe_point.lon}, alt: {mission_safe_point.alt}, frame: {mission_safe_point.frame}")
 
     return res
@@ -221,12 +224,12 @@ def get_fence_points(fd):
         is_circle_area = 0
 
         ret = dmread(fd, dm_item_t.DM_KEY_FENCE_POINTS.value, current_seq, mission_fence_point, dm_size.FENCE_POINTS_SIZE.value)
-        res.append(mission_fence_point)
+
 
         if ret != dm_size.FENCE_POINTS_SIZE.value:
             print("dm_read failed")
             break
-
+        res.append(mission_fence_point)
         if mission_fence_point.nav_cmd == NAV_CMD.FENCE_POLYGON_VERTEX_INCLUSION.value and vertex_count_temp == 0:
             print(f"number of vertex: {mission_fence_point.vertex_count}")
             vertex_count_temp = mission_fence_point.vertex_count
