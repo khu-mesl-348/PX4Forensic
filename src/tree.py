@@ -22,9 +22,9 @@ class Tree:
     # mav_serialport에 연결된 드론의 쉘 커맨드를 이용해 파일 목록을 불러오는 함수
     # @input: root 노드
     # @output: 드론의 파일/폴더를 노드로 하는 트리
-    def dfs(self, root):
+    def dfs(self, root, blacklist=[]):
         # 오류, 혹은 사용되지 않는 디렉토리 및 파일
-        blacklist = ['group/']
+
         datalist =[]
         self.stack.append(root)
         self.root.data = root
@@ -56,9 +56,10 @@ class Tree:
                 for idx, item in enumerate(datalist):
                     if idx < 2:
                         continue
-                    self.stack.append(item)
-                    leaf = Node(item)
-                    cur.append_child(leaf)
+                    if item not in blacklist:
+                        self.stack.append(item)
+                        leaf = Node(item)
+                        cur.append_child(leaf)
 
             datalist.clear()
 
