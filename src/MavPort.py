@@ -109,7 +109,7 @@ class MavlinkPort:
 
 
         # write some bytes
-        self.debug("sending '%s' of len %u\n" % (payload,  len(payload)), 2)
+        self.debug("sending '%s' of len %u" % (payload,  len(payload)), 2)
 
         payload.extend([0] * (251 - len(payload)))
         self.mav.mav.file_transfer_protocol_send(0, 0, 0, payload)
@@ -148,7 +148,18 @@ class MavlinkPort:
         return []
 
     def close(self):
-        self.mav.mav.serial_control_send(self.port, 0, 0, 0, 0, [0] * 70)
+        self.mav.close()
 
-    def ftp_close(self, seq_num):
-        self.ftp_write(opcode=1, seq_number=seq_num)
+    def ftp_close(self, seq_num, session=-1):
+        if session>-1:
+            self.ftp_write(opcode=1, seq_number=seq_num, session=session)
+        else:
+            self.ftp_write(opcode=2)
+
+        while True:
+            mavBuffer = self.ftp_read(4096)
+            if mavBuffer and len(mavBuffer) > 0:
+                print("terminate: ", mavBuffer)
+                break
+            else:
+                pass

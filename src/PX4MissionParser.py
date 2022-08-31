@@ -328,24 +328,3 @@ def get_key_compat(fd):
 
     return key_compat
 
-def main():
-    if not len(sys.argv) == 2 or sys.argv[1] == "help":	
-        print("[usage]: ./parser <file name> \n")
-        return 1    
-    print(sys.argv[1])
-    fd = os.open(sys.argv[1], os.O_BINARY)
-    if fd == -1:
-        print("invaild file\n")
-        return 1
-    
-    init()
-    
-    get_safe_points(fd)
-    get_fence_points(fd)
-    get_mission_item(fd, dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_0.value)
-    get_mission_item(fd, dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_1.value)
-    get_mission(fd)
-    get_key_compat(fd)
-    
-if __name__ == '__main__':
-    main()
