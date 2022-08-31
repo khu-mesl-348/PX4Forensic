@@ -118,19 +118,12 @@ class FTPReader:
 
         if root == "":
             root = self.tree_root
-
-        if type(root) != type(self.tree_root):
-            print(type(root))
-            return -1
-
-
-        st.append(root)
+            st.append(root)
 
         root_path = os.getcwd()
 
         while len(st) > 0:
             item = st.pop()
-
             # item = 부모 노드
             # item이 디렉토리면, chdir(item.data)
             # item이 파일이면, 아래 과정 무시
@@ -162,6 +155,7 @@ class FTPReader:
                         res = self.get_file_by_name(filename)
                         if res[0] == RELOAD:
                             print("재요청중...")
+                            self.mav_port.ftp_close(seq_num=0)
                         elif res[0] == SUCCESS:
                             search_result.append([filename, 'SUCCESS'])
                             break
@@ -187,7 +181,8 @@ class FTPReader:
                         pass
 
                 st.append(sub)
-        self.mav_port.ftp_close(seq_num=0)
+
+
         return search_result
 
     # ftp 관련 함수들
@@ -256,6 +251,7 @@ class FTPReader:
                         if mavBuffer['data'][0] == 2:  # 운영체제 사이드에서 오류
                             if mavBuffer['data'][1] == 13:  # Permission denied
                                 print("Permission denied")
+                                self.mav_port.ftp_close(seq_num=mavBuffer['seq_number'], session=0)
                                 return [FailErrno, EACCES]
 
                         if mavBuffer['data'][0] == SessionNotFound:
@@ -342,3 +338,11 @@ class FTPReader:
     # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
     def send_file_by_name(filename, filepath, mav_port):
         return
+
+    def close(self):
+        print("close port")
+        while True:
+            res = self.mav_port.ftp_close(seq_num=0)
+            if res == 1:
+                break
+        self.mav_port.close()

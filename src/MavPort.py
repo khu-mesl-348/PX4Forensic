@@ -160,6 +160,9 @@ class MavlinkPort:
             mavBuffer = self.ftp_read(4096)
             if mavBuffer and len(mavBuffer) > 0:
                 print("terminate: ", mavBuffer)
-                break
+                if mavBuffer['req_opcode'] == 2:
+                    return 1
+                else:
+                    return -1
             else:
                 pass
