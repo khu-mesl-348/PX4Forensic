@@ -7,6 +7,7 @@ from timeit import default_timer as timer
 import serial
 from pymavlink import mavutil
 from threading import Thread
+import struct
 
 # opcodes
 TerminateSession = 1
@@ -18,6 +19,7 @@ WriteFile = 7
 RemoveFile = 8
 CreateDirectory = 9
 RemoveDirectory = 10
+CalcFileCRC32 = 14
 BurstReadFile = 15
 
 # nak err info
@@ -29,7 +31,9 @@ SessionNotFound = 4
 FileNotFound = 10
 
 # nuttx errno
-EACCES = 2
+EACCES = 13
+ENOENT =  2
+EIO = 5
 
 
 class FTPReader:
@@ -107,10 +111,72 @@ class FTPReader:
         read_th.join()
 
 
+    def get_crc_from_UAV(self, root="", blacklist=[]):
+        st = []
+        search_result = []
+        blacklist = ['obj/', 'dev/']
+        if root == "":
+            root = self.tree_root
+            st.append(root)
+        seq_num = 0
+        while len(st) > 0:
+            item = st.pop()
+            # item = 부모 노드
+            # item이 디렉토리면, chdir(item.data)
+            # item이 파일이면, 아래 과정 무시
 
+            for sub in item.child:
+
+                # sub = 자식 노드
+                # sub이 디렉토리면, mkdir(sub.data)
+                # sub이 파일이면, 파일 생성
+                print("Data: ",sub.data)
+                if sub.data in blacklist:
+                    continue
+                cur = sub
+                filename = ""
+                # 현재 노드가 파일일 경우
+                if cur.data.find('/') == -1:
+                    while cur.parent != None:
+                        filename = cur.data + filename
+                        cur = cur.parent
+                    # root 경로 추가
+                    filename = '/' + filename
+                    # 해당 디렉토리에 파일 받기
+                    print(filename)
+
+                    while True:
+                        res = self.get_crc_by_name(filename, seq_num)
+                        if res[0] == RELOAD:
+                            print("재요청중...")
+                            # self.mav_port.ftp_close(seq_num=0)
+                        elif res[0] == SUCCESS:
+                            search_result.append([filename, 'SUCCESS', res[1]])
+                            seq_num += 1
+                            break
+                        elif res[0] == FailErrno:
+                            if res[1] == EACCES:
+                                search_result.append([filename, 'EACCES'])
+                            if res[1] == EIO:
+                                search_result.append([filename, 'EIO'])
+                            seq_num += 1
+                            break
+                        elif res[0] == SessionNotFound:
+                            print("Session not found. reloading...")
+                        elif res[0] == FileNotFound:
+                            search_result.append([filename, 'FILEEXISTSERROR'])
+                            break
+                        else:
+                            break
+
+                st.append(sub)
+
+        return search_result
+
+    msg_buf = []
     # 구성된 트리를 dfs 탐색하는 함수
     # @input: root: 탐색할 트리의 루트 노드
-    # @output: -
+    # @output: 불러온 파일 이름 및 다운로드 결과
     # description:
     def copy_data_from_UAV(self, root=""):
         st = []
@@ -155,9 +221,9 @@ class FTPReader:
                         res = self.get_file_by_name(filename)
                         if res[0] == RELOAD:
                             print("재요청중...")
-                            self.mav_port.ftp_close(seq_num=0)
+                            #self.mav_port.ftp_close(seq_num=0)
                         elif res[0] == SUCCESS:
-                            search_result.append([filename, 'SUCCESS'])
+                            search_result.append([filename, 'SUCCESS', res[1]])
                             break
                         elif res[0] == FailErrno:
                             if res[1] == EACCES:
@@ -185,13 +251,6 @@ class FTPReader:
 
         return search_result
 
-    # ftp 관련 함수들
-
-    # 전역변수
-    global filesize
-    global updated
-    global timeout
-
     msg_buf = []
 
     # 파일명으로 Drone의 파일을 ftp 전송받는 함수
@@ -199,9 +258,6 @@ class FTPReader:
     # @output: file
     # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
     def get_file_by_name(self, filename):
-        global filesize
-        global updated
-        global timeout
 
         filesize = 0
         # FTP 프로토콜
@@ -302,13 +358,17 @@ class FTPReader:
 
                     if mavBuffer and len(mavBuffer) > 0:
                         last_time = time.time()
+                        print(mavMsg)
                         mavMsg = mavBuffer
                         break
 
                 if mavMsg['opcode'] == 129:  # 파일 전송 도중 오류 처리
                     if mavMsg['data'][0] == 6:  # 파일 전송 완료
                         f.close()
-                        res = [SUCCESS]
+                        if mavMsg['size'] == 0:
+                            res = ['NO RESPONSE']
+                        else:
+                            res = [SUCCESS]
                         break
                     else:  # 다른 오류 발생 시
                         print(mavMsg)
@@ -329,6 +389,81 @@ class FTPReader:
 
         # ftp 세션 닫기
         self.mav_port.ftp_close(seq_num=mavMsg['seq_number'], session=0)
+
+        return res
+
+        # 파일명으로 crc값을 전송받는 함수
+        # @input: filename(ex. /fs/microse/dataman), MavlinkPort
+        # @output: crc
+        # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
+    def get_crc_by_name(self, filename, seq_num):
+
+        filesize = 0
+        # FTP 프로토콜
+        mavMsg = {
+            'seq_number': 0,
+            'session': 0,
+            'opcode': 0,
+            'size': 0,
+            'req_opcode': 0,
+            'burst_complete': 0,
+            'offset': 0,
+            'data': []
+        }
+
+        try:
+            # 버퍼 비우기
+            while True:
+                mavBuffer = self.mav_port.ftp_read(4096)
+                if mavBuffer and len(mavBuffer) > 0:
+                    print(mavBuffer)
+                else:
+                    break
+
+            # OpenFile 메시지 전송 후 파일 크기 받아옴
+            self.mav_port.ftp_write(opcode=CalcFileCRC32, data=filename, size=len(filename), seq_number=seq_num)
+            total_size = 0
+            offset = 0
+            timeout = 0
+            print(filename, "\n===============")
+
+            # OpenFile 후 ACK 파싱
+            while True:
+                mavMsg['seq_number'] = 0
+                mavBuffer = self.mav_port.ftp_read(4096)
+                if mavBuffer and len(mavBuffer) > 0:
+                    print(mavBuffer)
+                    if mavBuffer['opcode'] == 129:  # 오류 처리
+                        if mavBuffer['data'][0] == 2:  # 운영체제 사이드에서 오류
+                            if mavBuffer['data'][1] == 5:
+                                print("I/O Error")
+                                return [FailErrno, EIO]
+                            if mavBuffer['data'][1] == 13:  # Permission denied
+                                print("Permission denied")
+                                return [FailErrno, EACCES]
+                            return[FailErrno, mavBuffer['data'][1]]
+
+                        if mavBuffer['data'][0] == SessionNotFound:
+                            print('session not found')
+                            return [SessionNotFound]
+                        if mavBuffer['data'][0] == 10:  # 파일이 존재하지 않을 시
+                            print("File not found")
+                            return [FileNotFound]
+
+                        print("파일을 불러오는데 실패하였습니다.")
+                        return [RELOAD]
+                        break
+
+                    else:
+                        mavMsg = mavBuffer
+                        crc = mavMsg['data'][0] + mavMsg['data'][1]*256 + mavMsg['data'][2]*pow(256,2) +mavMsg['data'][3]*pow(256,3)
+                        res = [SUCCESS, crc]
+                        break
+
+
+
+        except serial.serialutil.SerialException as e:
+            print(e)
 
         return res
 
