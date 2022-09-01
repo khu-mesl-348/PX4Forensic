@@ -72,8 +72,7 @@ def dmread(fd, item, index, buf, count):
         return -1
     if count > (g_per_item_size[item] - DM_SECTOR_HDR_SIZE):
         return -1
-    
-    length = -1
+
     read_success = 0
     for i in range(2):
         ret_seek = os.lseek(fd, offset, os.SEEK_SET)
@@ -100,9 +99,6 @@ def dmread(fd, item, index, buf, count):
             break
         if not read_success:
             return -1
-    
-    if length == 0:
-        buffer[0] = 0
     
     if buffer[0] > 0:
         if buffer[0] > count:
