@@ -10,8 +10,7 @@
 
 import hashlib
 import os.path, time
-import sys
-from PX4MissionParser import *
+from src.Mission.Mission.PX4MissionParser import *
 
 def hash_sha1(filepath, blocksize=8192):
     sha_1 = hashlib.sha1()
@@ -96,6 +95,7 @@ def main():
 
     encrypted = is_encrypted(safe_points, fence_points, mission_0, mission_1, mission_stats)
 
+    print(created, hashSha, hashMD5, encrypted)
 
 if __name__ == '__main__':
     main()
