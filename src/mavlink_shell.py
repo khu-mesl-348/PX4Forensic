@@ -1,5 +1,5 @@
 from pymavlink import mavutil
-from src.MavPort import MavlinkPort
+from MavPort import MavlinkPort
 
 def get_serial_item():
     res = []
@@ -24,7 +24,7 @@ def connect_to_serial(port):
     # MAVLink 연결
     print("Connecting to MAVLINK...")
     try:
-        mav_serialport = MavlinkSerialPort(port, baudrate=115200, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
+        mav_serialport = MavlinkPort(port, baudrate=115200, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
         mav_serialport.write('\n')  # make sure the shell is started
         print('PX4 connect complete')
 

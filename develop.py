@@ -3,10 +3,9 @@ import serial
 import os
 from pymavlink import mavutil
 from threading import Thread
-from src.tools import SerialPort
-from src.tree import Tree
+from src.Mission.tools import SerialPort
+from src.Mission.tree import Tree
 import time
-from src.MavPort import MavlinkPort
 import sys
 
 # opcodes

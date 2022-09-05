@@ -10,7 +10,7 @@
 
 import hashlib
 import os.path, time
-from src.Mission.Mission.PX4MissionParser import *
+from src.Mission.PX4MissionParser import *
 
 def hash_sha1(filepath, blocksize=8192):
     sha_1 = hashlib.sha1()

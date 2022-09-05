@@ -1,13 +1,12 @@
-from src.tree import Tree
+from src.Mission.tree import Tree
 import time
-from src.tools import SerialPort
+from src.Mission.tools import SerialPort
 import sys
 import os
 from timeit import default_timer as timer
 import serial
 from pymavlink import mavutil
 from threading import Thread
-import struct
 
 # opcodes
 TerminateSession = 1
@@ -223,7 +222,7 @@ class FTPReader:
                             print("재요청중...")
                             #self.mav_port.ftp_close(seq_num=0)
                         elif res[0] == SUCCESS:
-                            search_result.append([filename, 'SUCCESS', res[1]])
+                            search_result.append([filename, 'SUCCESS'])
                             break
                         elif res[0] == FailErrno:
                             if res[1] == EACCES:
