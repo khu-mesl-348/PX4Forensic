@@ -45,20 +45,14 @@ def hash_md5(filepath, blocksize=8192):
 def createdTime(filepath):
     return time.ctime(os.path.getmtime(filepath))
 
-def is_encrypted(safe, fence, mission0, mission1, stats):
-    if safe[0].num_items != len(safe) - 1:
+def is_encrypted(safe, fence, mission, stats):
+    if safe[0][0] != len(safe) - 1:
         return 1
 
-    if fence[0].num_items != len(fence) - 1:
+    if fence[0][0] != len(fence) - 1:
         return 1
 
-    if stats.dataman_id == 2:
-        if stats.count != len(mission0):
-            return 1
-    elif stats.dataman_id == 3:
-        if stats.count != len(mission1):
-            return 1
-    else:
+    if stats[2] != len(mission):
         return 1
 
     return 0
@@ -71,18 +65,20 @@ def main():
 
     filename = sys.argv[1]
     fd = os.open(filename, os.O_BINARY)
+
+    parser = missionParser(fd)
+
     if fd == -1:
         print("invaild file\n")
         return 1
 
-    init()
 
-    safe_points = get_safe_points(fd)
-    fence_points = get_fence_points(fd)
-    mission_0 = get_mission_item(fd, dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_0.value)
-    mission_1 = get_mission_item(fd, dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_1.value)
-    mission_stats = get_mission(fd)
-    key_compat = get_key_compat(fd)
+    safe_points = parser.get_safe_points()
+#    fence_points = get_fence_points(fd)
+#    mission_0 = get_mission_item(fd, dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_0.value)
+#    mission_1 = get_mission_item(fd, dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_1.value)
+#    mission_stats = get_mission(fd)
+#    key_compat = get_key_compat(fd)
 
     dataman = []
 
@@ -93,9 +89,7 @@ def main():
     hashSha = hash_sha1(filename)
     hashMD5 = hash_md5(filename)
 
-    encrypted = is_encrypted(safe_points, fence_points, mission_0, mission_1, mission_stats)
 
-    print(created, hashSha, hashMD5, encrypted)
 
 if __name__ == '__main__':
     main()

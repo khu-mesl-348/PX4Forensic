@@ -24,6 +24,14 @@ class MavlinkPort:
         if self._debug >= level:
             print('debug: '+s)
 
+    def set_port(self, portname, baudrate):
+        self.close()
+        self.mav = mavutil.mavlink_connection(portname, autoreconnect=True, baud=baudrate)
+        self.mav.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GENERIC, mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
+        self.mav.wait_heartbeat()
+        self.debug("HEARTBEAT OK\n")
+        self.debug("Locked serial device\n")
+
     def serial_write(self, b):
         # write some bytes
         #self.debug("sending '%s' (0x%02x) of len %u\n" % (b, ord(b[0]), len(b)), 2)

@@ -37,10 +37,14 @@ EIO = 5
 
 class FTPReader:
 
-    def __init__(self, blacklist=['group/', 'mmcsd0'], root="/"):
+    def __init__(self, blacklist=['group/', 'mmcsd0'], root="/", _port=None):
         fd_in = sys.stdin.fileno()
         self.ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
-        self.mav_port = SerialPort()
+        if _port is None:
+            self.mav_port = SerialPort()
+        else:
+            self.mav_port = _port
+
         self.root = root
         tree = Tree(self.mav_port)
         tree.dfs(root, blacklist)

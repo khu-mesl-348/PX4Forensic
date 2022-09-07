@@ -1,5 +1,5 @@
 from pymavlink import mavutil
-from MavPort import MavlinkPort
+from src.MavPort import MavlinkPort
 
 def get_serial_item():
     res = []
