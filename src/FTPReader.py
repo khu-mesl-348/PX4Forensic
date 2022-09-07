@@ -47,8 +47,9 @@ class FTPReader:
 
         self.root = root
         tree = Tree(self.mav_port)
-        tree.dfs(root, blacklist)
+        self.total_count = tree.dfs(root, blacklist)
         self.tree_root = tree.get_root()
+
 
 
     # 실시간 Shell을 여는 함수
@@ -181,7 +182,7 @@ class FTPReader:
     # @input: root: 탐색할 트리의 루트 노드
     # @output: 불러온 파일 이름 및 다운로드 결과
     # description:
-    def copy_data_from_UAV(self, root=""):
+    def copy_data_from_UAV(self, root="", ui=None):
         st = []
         search_result = []
 
@@ -220,6 +221,7 @@ class FTPReader:
                     filename = '/' + filename
                     # 해당 디렉토리에 파일 받기
                     print(filename)
+                    ui.curDownload.setText(filename)
                     while True:
                         res = self.get_file_by_name(filename)
                         if res[0] == RELOAD:

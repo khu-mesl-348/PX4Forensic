@@ -30,6 +30,7 @@ class Tree:
         self.stack.append(root)
         self.root.data = root
         cur = self.root
+        count = 0
         cmd_cd("/", self.mav_serialport)
         while len(self.stack) != 0:
             item = self.stack.pop()
@@ -52,6 +53,8 @@ class Tree:
                     if next.data == item:
                         cur = next
                         break
+            elif "/" not in item and item not in blacklist:
+                count += 1
 
             if len(datalist) != 0:
                 for idx, item in enumerate(datalist):
@@ -63,6 +66,7 @@ class Tree:
                         cur.append_child(leaf)
 
             datalist.clear()
+        return count
 
     def get_root(self):
         return self.root

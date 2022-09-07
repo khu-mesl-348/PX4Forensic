@@ -20,6 +20,7 @@ def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 �
 #UI파일 연결
 #단, UI파일은 Python 코드 파일과 같은 디렉토리에 위치해야한다.
 form_class = uic.loadUiType("PX4Forensic.ui")[0]
+download_class = uic.loadUiType("downloadProgress.ui")[0]
 
 #화면을 띄우는데 사용되는 Class 선언
 class WindowClass(QMainWindow, form_class) :
@@ -30,7 +31,9 @@ class WindowClass(QMainWindow, form_class) :
 
         self.setupUi(self)
         self.parser = missionParser(parser_fd)
-
+        self.progressbar = QProgressBar()
+        self.statusbar.addPermanentWidget(self.progressbar)
+        self.step = 0
         # port 연결
         serial_list = get_serial_item()
         for item in serial_list:
@@ -58,48 +61,130 @@ class WindowClass(QMainWindow, form_class) :
         # 파일 정보 표시
         self.fileInfo("./../src/dataman")
 
-
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
 
 
     def getFileFromUAV(self):
-        self.ftp.copy_data_from_UAV()
+        self.dataRefreshButton.setDisabled(True)
+        st = []
+        root = self.ftp.tree_root
+        search_result = []
+        st.append(root)
+        i = 0
+        while len(st) > 0:
+            item = st.pop()
+            # item = 부모 노드
+            # item이 디렉토리면, chdir(item.data)
+            # item이 파일이면, 아래 과정 무시
+
+            if item != root:
+                if item.data.find('/') != -1:
+                    while (not os.path.exists(item.data)):
+                        os.chdir("..")
+                    os.chdir(item.data)
+
+            for sub in item.child:
+
+                # sub = 자식 노드
+                # sub이 디렉토리면, mkdir(sub.data)
+                # sub이 파일이면, 파일 생성
+
+                cur = sub
+                filename = ""
+                # 현재 노드가 파일일 경우
+                if cur.data.find('/') == -1:
+                    while cur.parent != None:
+                        filename = cur.data + filename
+                        cur = cur.parent
+                    # root 경로 추가
+                    filename = '/' + filename
+                    # 해당 디렉토리에 파일 받기
+                    print(filename, self.ftp.total_count)
+                    if self.step >= 100:
+                        self.step = 0
+
+                    self.statusbar.showMessage(filename)
+                    self.statusbar.repaint()
+                    while True:
+                        res = self.ftp.get_file_by_name(filename)
+                        if res[0] == -1:
+                            print("재요청중...")
+                            # self.mav_port.ftp_close(seq_num=0)
+                        elif res[0] == 0:
+                            search_result.append([filename, 'SUCCESS'])
+                            self.step = int((i / self.ftp.total_count)*100)
+                            self.progressbar.setValue(self.step)
+                            print(i)
+                            QApplication.processEvents()
+
+                            i += 1
+                            break
+                        elif res[0] == 2:
+                            if res[1] == 13:
+                                search_result.append([filename, 'EACCES'])
+                                break
+                        elif res[0] == 4:
+                            print("Session not found. reloading...")
+                        elif res[0] == 10:
+                            search_result.append([filename, 'FILEEXISTSERROR'])
+                            break
+                        else:
+                            break
+
+                else:
+                    try:
+                        foldername = sub.data
+                        while foldername[0] == " ":
+                            foldername = foldername[1:]
+                        os.makedirs(foldername)
+                    except FileExistsError:
+                        pass
+
+                st.append(sub)
+        self.statusbar.showMessage("")
+        self.statusbar.repaint()
+        self.progressbar.setValue(0)
+        QApplication.processEvents()
+        self.dataRefreshButton.setEnabled(True)
+
+
 
     def fileInfo(self, filename):
-        fd = os.open(filename, os.O_BINARY)
-        if fd < 0:
-            self.getFileFromUAV()
             fd = os.open(filename, os.O_BINARY)
             if fd < 0:
-                return -1
+                self.getFileFromUAV()
+                fd = os.open(filename, os.O_BINARY)
+                if fd < 0:
+                    return -1
 
-        datamanId = self.parser.get_mission()[3]
-        created = createdTime(filename)
-        hashSha = hash_sha1(filename)
-        hashMD5 = hash_md5(filename)
-        encrypt = is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
-                               self.parser.get_mission_item(datamanId), self.parser.get_mission())
-        if encrypt == 0:
-            encrypt = "False"
-        elif encrypt ==1 :
-            encrypt = "True"
+            datamanId = self.parser.get_mission()[3]
+            created = createdTime(filename)
+            hashSha = hash_sha1(filename)
+            hashMD5 = hash_md5(filename)
+            encrypt = is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
+                                   self.parser.get_mission_item(datamanId), self.parser.get_mission())
+            if encrypt == 0:
+                encrypt = "False"
+            elif encrypt ==1 :
+                encrypt = "True"
 
-        header = ["created", "MD5", "SHA-1", "encrypted"]
-        data = [created, hashSha,hashMD5,encrypt]
+            header = ["created", "MD5", "SHA-1", "encrypted"]
+            data = [created, hashSha,hashMD5,encrypt]
 
-        self.tableWidget_file.setColumnCount(2)
-        self.tableWidget_file.setRowCount(len(header))
-        self.tableWidget_file.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_file.verticalHeader().setVisible(False)
-        self.tableWidget_file.horizontalHeader().setVisible(False)
+            self.tableWidget_file.setColumnCount(2)
+            self.tableWidget_file.setRowCount(len(header))
+            self.tableWidget_file.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.tableWidget_file.verticalHeader().setVisible(False)
+            self.tableWidget_file.horizontalHeader().setVisible(False)
 
-        for i in range(len(header)):
-            self.tableWidget_file.setItem(i, 0, QTableWidgetItem(header[i]))
-            self.tableWidget_file.setItem(i, 1, QTableWidgetItem(str(data[i])))
+            for i in range(len(header)):
+                self.tableWidget_file.setItem(i, 0, QTableWidgetItem(header[i]))
+                self.tableWidget_file.setItem(i, 1, QTableWidgetItem(str(data[i])))
 
-        self.tableWidget_file.resizeRowsToContents()
-        self.tableWidget_file.resizeColumnsToContents()
-        os.close(fd)
+            self.tableWidget_file.resizeRowsToContents()
+            self.tableWidget_file.resizeColumnsToContents()
+            os.close(fd)
+
 
     def portCliked(self,port, des):
         if self.mavPort == None or port == "close":
