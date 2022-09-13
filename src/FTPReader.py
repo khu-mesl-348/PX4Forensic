@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 import serial
 from pymavlink import mavutil
 from threading import Thread
-
+from src.Mission.tools import command
 # opcodes
 TerminateSession = 1
 ResetSession = 2
@@ -40,17 +40,21 @@ class FTPReader:
     def __init__(self, blacklist=['group/', 'mmcsd0'], root="/", _port=None):
         fd_in = sys.stdin.fileno()
         self.ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
-        if _port is None:
-            self.mav_port = SerialPort()
-        else:
-            self.mav_port = _port
-
         self.root = root
+        if _port is None:
+            self.mav_port = None
+        else:
+            self.connect_port(_port, blacklist)
+
+
+
+
+
+    def connect_port(self, port, blacklist=[]):
+        self.mav_port = port
         tree = Tree(self.mav_port)
-        self.total_count = tree.dfs(root, blacklist)
+        self.total_count = tree.dfs(self.root, blacklist)
         self.tree_root = tree.get_root()
-
-
 
     # 실시간 Shell을 여는 함수
     # @input: MavlinkSerialPort 객체
@@ -182,7 +186,7 @@ class FTPReader:
     # @input: root: 탐색할 트리의 루트 노드
     # @output: 불러온 파일 이름 및 다운로드 결과
     # description:
-    def copy_data_from_UAV(self, root="", ui=None):
+    def copy_data_from_UAV(self, root=""):
         st = []
         search_result = []
 
@@ -221,7 +225,6 @@ class FTPReader:
                     filename = '/' + filename
                     # 해당 디렉토리에 파일 받기
                     print(filename)
-                    ui.curDownload.setText(filename)
                     while True:
                         res = self.get_file_by_name(filename)
                         if res[0] == RELOAD:
@@ -330,7 +333,6 @@ class FTPReader:
                         mavMsg = mavBuffer
                         break
 
-            print(mavMsg)
 
             # OpenFile 성공시 데이터 길이 추출
             if len(mavMsg['data']) == 4:
@@ -349,42 +351,68 @@ class FTPReader:
                 read_size = total_size - offset
 
             # 파일 Open
-            f = open(file, 'wb')
+
+
+            # size가 0일시 cat으로 불러오기 시도
+            if total_size == 0 and filename.split("/")[1] != 'dev' and filename.split("/")[1] != 'obj':
+                if file == "mtd_params" or file == "mtd_waypoints":
+                    f = open(file, 'wb')
+                else:
+                    f = open(file, 'w')
+                param = "cat " + filename + "\n"
+                print("cat parsing..")
+                data = command(param, self.mav_port)
+                data = data[data.find("\n")+1:]
+
+
+                if file == "mtd_params" or file == "mtd_waypoints":
+                    print(type(data))
+                    data = data.encode()
+                    print(type(data))
+                    print("mtd_params: ", data)
+                    f.write(data)
+                else:
+                    f.write(data)
+                print("data:", data)
+                f.close()
+                res = [SUCCESS]
 
             # 파일 전송 요청
-            while True:
-                cur_seq = mavMsg['seq_number']
-                self.mav_port.ftp_write(opcode=ReadFile, session=mavMsg['session'], size=read_size, offset=offset,
-                                         seq_number=mavMsg['seq_number'])
-
+            else:
+                f = open(file, 'wb')
                 while True:
-                    print(f"{filename}: {offset} of {total_size}")
-                    mavBuffer = self.mav_port.ftp_read(4096)
+                    cur_seq = mavMsg['seq_number']
+                    self.mav_port.ftp_write(opcode=ReadFile, session=mavMsg['session'], size=read_size, offset=offset,
+                                             seq_number=mavMsg['seq_number'])
 
-                    if mavBuffer and len(mavBuffer) > 0:
-                        last_time = time.time()
-                        print(mavMsg)
-                        mavMsg = mavBuffer
-                        break
+                    while True:
+                        print(f"{filename}: {offset} of {total_size}")
+                        mavBuffer = self.mav_port.ftp_read(4096)
 
-                if mavMsg['opcode'] == 129:  # 파일 전송 도중 오류 처리
-                    if mavMsg['data'][0] == 6:  # 파일 전송 완료
-                        f.close()
-                        if mavMsg['size'] == 0:
-                            res = ['NO RESPONSE']
-                        else:
-                            res = [SUCCESS]
-                        break
-                    else:  # 다른 오류 발생 시
-                        print(mavMsg)
-                        print("파일을 불러오는 도중 오류가 발생하였습니다..")
-                        res = [RELOAD]
-                        break
-                else:  # 데이터 정상 수신
-                    for c in mavMsg['data']:
-                        f.write(c.to_bytes(1, byteorder='little'))
+                        if mavBuffer and len(mavBuffer) > 0:
+                            last_time = time.time()
+                            print(mavMsg)
+                            mavMsg = mavBuffer
+                            break
 
-                offset += read_size
+                    if mavMsg['opcode'] == 129:  # 파일 전송 도중 오류 처리
+                        if mavMsg['data'][0] == 6:  # 파일 전송 완료
+                            f.close()
+                            if mavMsg['size'] == 0:
+                                res = ['NO RESPONSE']
+                            else:
+                                res = [SUCCESS]
+                            break
+                        else:  # 다른 오류 발생 시
+                            print(mavMsg)
+                            print("파일을 불러오는 도중 오류가 발생하였습니다..")
+                            res = [RELOAD]
+                            break
+                    else:  # 데이터 정상 수신
+                        for c in mavMsg['data']:
+                            f.write(c.to_bytes(1, byteorder='little'))
+
+                    offset += read_size
 
         except serial.serialutil.SerialException as e:
             print(e)
@@ -486,3 +514,4 @@ class FTPReader:
             if res == 1:
                 break
         self.mav_port.close()
+
