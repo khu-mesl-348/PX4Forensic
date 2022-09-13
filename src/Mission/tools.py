@@ -57,19 +57,20 @@ def SerialPort(port='auto'):
 
 def command(param, mav_serialport):
     mav_serialport.serial_write(param)
+
     ret = ''
     while True:
         data = mav_serialport.serial_read(4096)
         if data and len(data) > 0:
-
-            if data.find('nsh>') != -1:
-                # nsh> 제거
-                data = data[:data.find('nsh>')]
-                # 줄바꿈 제거
-                ret += data
-                ret = ret[:-1]
-                break
             ret += data
+            if ret.find('nsh>') != -1:
+                # nsh> 제거
+                ret = ret[:ret.find('nsh>')]
+                # 줄바꿈 제거
+                if ret[-1] == "\n":
+                    ret = ret[:-1]
+                break
+
 
     return ret
 

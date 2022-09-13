@@ -19,15 +19,15 @@ def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 �
 
 #UI파일 연결
 #단, UI파일은 Python 코드 파일과 같은 디렉토리에 위치해야한다.
-form_class = uic.loadUiType("PX4Forensic.ui")[0]
-download_class = uic.loadUiType("downloadProgress.ui")[0]
+form_class = uic.loadUiType("ui/PX4Forensic.ui")[0]
+download_class = uic.loadUiType("ui/downloadProgress.ui")[0]
 
 #화면을 띄우는데 사용되는 Class 선언
 class WindowClass(QMainWindow, form_class) :
     def __init__(self) :
         super().__init__()
-        filename = "./../src/dataman"
-        parser_fd = os.open(filename, os.O_BINARY)
+        dataman = "./src/dataman"
+        parser_fd = os.open(dataman, os.O_BINARY)
 
         self.setupUi(self)
         self.parser = missionParser(parser_fd)
@@ -36,13 +36,15 @@ class WindowClass(QMainWindow, form_class) :
         self.step = 0
         # port 연결
         serial_list = get_serial_item()
-        for item in serial_list:
-            portAction = QAction(item[0])
-            portAction.triggered.connect(lambda: self.portClicked(item[0],item[1]))
-            self.menu_port2.addAction(portAction)
-        disconnAction = QAction("연결 끊기")
-        portAction.triggered.connect(lambda: self.portClicked("close",""))
-        self.menu_port2.addAction(disconnAction)
+
+        if len(serial_list) != 0:
+            for item in serial_list:
+                portAction = QAction(item[0])
+                portAction.triggered.connect(lambda: self.portClicked(item[0],item[1]))
+                self.menu_port2.addAction(portAction)
+            disconnAction = QAction("연결 끊기")
+            portAction.triggered.connect(lambda: self.portClicked("close",""))
+            self.menu_port2.addAction(disconnAction)
 
         if len(serial_list) != 0:
             self.mavPort = SerialPort(serial_list[0][0])
@@ -51,6 +53,8 @@ class WindowClass(QMainWindow, form_class) :
             self.mavPort = None
             self.label_connected.setText(f"unconnected")
 
+
+        #self.ftp = FTPReader(_port=None)
         self.ftp = FTPReader(_port=self.mavPort)
         # Mission - radiobox 트리거 함수 연결
 
@@ -59,7 +63,7 @@ class WindowClass(QMainWindow, form_class) :
         self.radio_waypoint.toggled.connect(self.wayClicked)
 
         # 파일 정보 표시
-        self.fileInfo("./../src/dataman")
+        self.fileInfo("./src/dataman")
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
 
