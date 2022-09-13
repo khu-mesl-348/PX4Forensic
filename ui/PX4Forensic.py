@@ -309,7 +309,7 @@ class WindowClass(QMainWindow, form_class) :
                 self.tableWidget_point.setItem(idx, i, QTableWidgetItem(item[i]))
         self.tableWidget_point.resizeRowsToContents()
 
-if __name__ == "__main__" :
+def PX4Forensic():
     suppress_qt_warnings()
     #QApplication : 프로그램을 실행시켜주는 클래스
     app = QApplication(sys.argv) 
