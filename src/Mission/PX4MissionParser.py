@@ -182,7 +182,7 @@ class missionParser:
             if ret != dm_size.SAFE_POINTS_SIZE.value:
                 print("dm_read failed\n")
                 continue
-            res.append([mission_safe_point.current_seq, mission_safe_point.lat, mission_safe_point.lon, mission_safe_point.alt, mission_safe_point.frame])
+            res.append([mission_safe_point.lat, mission_safe_point.lon, mission_safe_point.alt, mission_safe_point.frame])
 
             #printf("ret: %d, size: %ld\n",ret ,sizeof(struct mission_safe_point_s));
             print(f"{current_seq} th point: lat: {mission_safe_point.lat}, lon: {mission_safe_point.lon}, alt: {mission_safe_point.alt}, frame: {mission_safe_point.frame}")
@@ -282,7 +282,7 @@ class missionParser:
             dmsize = dm_item_s.DM_KEY_WAYPOINTS_OFFBOARD_1_MAX.value
         else:
             print("invaild datamam id")
-            return [-1]
+            return []
 
         for i in range(dmsize):
             ret = self.dmread(dataman_id, i, missionitem, dm_size.WAYPOINTS_OFFBOARD_SIZE.value)

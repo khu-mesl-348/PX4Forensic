@@ -58,21 +58,26 @@ class WindowClass(QMainWindow, form_class) :
         dataman = "./fs/microsd/dataman"
         try:
             parser_fd = os.open(dataman, os.O_BINARY)
-        except FileNotFoundError as e:
-            print(e)
-            self.getFileFromUAV()
-            parser_fd = os.open(dataman, os.O_BINARY)
-            pass
+            self.parser = missionParser(parser_fd)
 
-        self.parser = missionParser(parser_fd)
+            # 파일 정보 표시
+            self.fileInfo(dataman)
+        except FileNotFoundError as e:
+            self.parser = None
+            print(e)
+            pass
+        except AttributeError as a:
+            print(a)
+            QMessageBox.about(self, '파일 오류', '파일이 잘못됨.')
+            
+
+
 
         # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
         self.radio_geofencepoint.toggled.connect(self.geoClicked)
         self.radio_waypoint.toggled.connect(self.wayClicked)
 
-        # 파일 정보 표시
-        self.fileInfo("./src/dataman")
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
 
@@ -160,6 +165,18 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.showMessage("")
         self.statusbar.repaint()
         self.progressbar.setValue(0)
+        dataman = "./fs/microsd/dataman"
+        try:
+            parser_fd = os.open(dataman, os.O_BINARY)
+            self.parser = missionParser(parser_fd)
+
+            # 파일 정보 표시
+            self.fileInfo(dataman)
+        except FileNotFoundError as e:
+            self.parser = None
+            print(e)
+            pass
+
         QApplication.processEvents()
         self.dataRefreshButton.setEnabled(True)
         self.radio_safepoint.setEnabled(True)
@@ -218,119 +235,145 @@ class WindowClass(QMainWindow, form_class) :
             self.label_connected.setText(f"connected: {des}({port})")
 
     def safeClicked(self):
-        safePoints = self.parser.get_safe_points()
+        try:
+            safePoints = self.parser.get_safe_points()
 
-        stat_headers = ["num_items", "update_counter"]
-        column_headers = ['lat', 'lon', 'alt', 'frame']
+            stat_headers = ["num_items", "update_counter"]
+            column_headers = ['lat', 'lon', 'alt', 'frame']
 
-        self.tableWidget_status.clearContents()
-        self.tableWidget_point.clearContents()
+            self.tableWidget_status.clearContents()
+            self.tableWidget_point.clearContents()
 
-        self.tableWidget_status.setColumnCount(len(stat_headers))
-        self.tableWidget_status.setRowCount(1)
-        self.tableWidget_status.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_status.setHorizontalHeaderLabels(stat_headers)
-        self.tableWidget_status.verticalHeader().setVisible(False)
+            self.tableWidget_status.setColumnCount(len(stat_headers))
+            self.tableWidget_status.setRowCount(1)
+            self.tableWidget_status.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.tableWidget_status.setHorizontalHeaderLabels(stat_headers)
+            self.tableWidget_status.verticalHeader().setVisible(False)
 
-        self.tableWidget_point.setColumnCount(len(column_headers))
-        self.tableWidget_point.setRowCount(len(safePoints)-1)
-        self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
+            self.tableWidget_point.setColumnCount(len(column_headers))
+            self.tableWidget_point.setRowCount(len(safePoints) - 1)
+            self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
 
-        print(safePoints)
-        for idx, item in enumerate(safePoints):
+            print(safePoints)
+            for idx, item in enumerate(safePoints):
 
-            for i, num in enumerate(item):
-                if type(num) != "str":
-                    item[i] = str(num)
-            if idx == 0:
-                self.tableWidget_status.setItem(idx, 0, QTableWidgetItem(item[0]))
-                self.tableWidget_status.setItem(idx, 1, QTableWidgetItem(item[1]))
-            else:
-                self.tableWidget_point.setItem(idx-1, 0, QTableWidgetItem(item[0]))
-                self.tableWidget_point.setItem(idx-1, 1, QTableWidgetItem(item[1]))
-                self.tableWidget_point.setItem(idx-1, 2, QTableWidgetItem(item[2]))
-                self.tableWidget_point.setItem(idx-1, 3, QTableWidgetItem(item[3]))
+                for i, num in enumerate(item):
+                    if type(num) != "str":
+                        item[i] = str(num)
+                if idx == 0:
+                    self.tableWidget_status.setItem(idx, 0, QTableWidgetItem(item[0]))
+                    self.tableWidget_status.setItem(idx, 1, QTableWidgetItem(item[1]))
+                else:
+                    self.tableWidget_point.setItem(idx - 1, 0, QTableWidgetItem(item[0]))
+                    self.tableWidget_point.setItem(idx - 1, 1, QTableWidgetItem(item[1]))
+                    self.tableWidget_point.setItem(idx - 1, 2, QTableWidgetItem(item[2]))
+                    self.tableWidget_point.setItem(idx - 1, 3, QTableWidgetItem(item[3]))
 
-        self.tableWidget_point.resizeRowsToContents()
+            self.tableWidget_point.resizeRowsToContents()
+
+        except FileNotFoundError as e:
+            print(e)
+            QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
+            pass
+        except AttributeError as a:
+            print(a)
+            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+
 
     def geoClicked(self):
-        geoPoints = self.parser.get_fence_points()
+        try:
+            geoPoints = self.parser.get_fence_points()
 
-        stat_headers = ["num_items", "update_counter"]
-        column_headers = ['lat', 'lon', 'alt', 'vertex/radius', 'nav_cmd', 'frame']
+            stat_headers = ["num_items", "update_counter"]
+            column_headers = ['lat', 'lon', 'alt', 'vertex/radius', 'nav_cmd', 'frame']
 
-        self.tableWidget_status.clearContents()
-        self.tableWidget_point.clearContents()
+            self.tableWidget_status.clearContents()
+            self.tableWidget_point.clearContents()
 
-        self.tableWidget_status.setColumnCount(len(stat_headers))
-        self.tableWidget_status.setRowCount(1)
-        self.tableWidget_status.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_status.setHorizontalHeaderLabels(stat_headers)
-        self.tableWidget_status.verticalHeader().setVisible(False)
+            self.tableWidget_status.setColumnCount(len(stat_headers))
+            self.tableWidget_status.setRowCount(1)
+            self.tableWidget_status.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.tableWidget_status.setHorizontalHeaderLabels(stat_headers)
+            self.tableWidget_status.verticalHeader().setVisible(False)
 
-        self.tableWidget_point.setColumnCount(len(column_headers))
-        self.tableWidget_point.setRowCount(len(geoPoints) - 1)
-        self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
+            self.tableWidget_point.setColumnCount(len(column_headers))
+            self.tableWidget_point.setRowCount(len(geoPoints) - 1)
+            self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
 
-        print(geoPoints)
-        for idx, item in enumerate(geoPoints):
-            print(item)
-            for i, num in enumerate(item):
-                if type(num) != "str":
-                    item[i] = str(num)
-            if idx == 0:
-                self.tableWidget_status.setItem(idx, 0, QTableWidgetItem(item[0]))
-                self.tableWidget_status.setItem(idx, 1, QTableWidgetItem(item[1]))
-            else:
-                self.tableWidget_point.setItem(idx-1, 0, QTableWidgetItem(item[0]))
-                self.tableWidget_point.setItem(idx-1, 1, QTableWidgetItem(item[1]))
-                self.tableWidget_point.setItem(idx-1, 2, QTableWidgetItem(item[2]))
-                self.tableWidget_point.setItem(idx-1, 3, QTableWidgetItem(item[3]))
-                self.tableWidget_point.setItem(idx-1, 4, QTableWidgetItem(item[4]))
-                self.tableWidget_point.setItem(idx-1, 5, QTableWidgetItem(item[5]))
+            print(geoPoints)
+            for idx, item in enumerate(geoPoints):
+                print(item)
+                for i, num in enumerate(item):
+                    if type(num) != "str":
+                        item[i] = str(num)
+                if idx == 0:
+                    self.tableWidget_status.setItem(idx, 0, QTableWidgetItem(item[0]))
+                    self.tableWidget_status.setItem(idx, 1, QTableWidgetItem(item[1]))
+                else:
+                    self.tableWidget_point.setItem(idx-1, 0, QTableWidgetItem(item[0]))
+                    self.tableWidget_point.setItem(idx-1, 1, QTableWidgetItem(item[1]))
+                    self.tableWidget_point.setItem(idx-1, 2, QTableWidgetItem(item[2]))
+                    self.tableWidget_point.setItem(idx-1, 3, QTableWidgetItem(item[3]))
+                    self.tableWidget_point.setItem(idx-1, 4, QTableWidgetItem(item[4]))
+                    self.tableWidget_point.setItem(idx-1, 5, QTableWidgetItem(item[5]))
 
-        self.tableWidget_point.resizeRowsToContents()
+            self.tableWidget_point.resizeRowsToContents()
+        except FileNotFoundError as e:
+            print(e)
+            QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
+            pass
+        except AttributeError as a:
+            print(a)
+            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
     def wayClicked(self):
-        mission = self.parser.get_mission()
-        print(mission)
-        waypoints = self.parser.get_mission_item(mission[3])
+        try:
+            mission = self.parser.get_mission()
+            print(mission)
+            waypoints = self.parser.get_mission_item(mission[3])
 
-        stat_headers = ["timestamp", 'current_seq', 'count', 'dataman_id']
-        column_headers = ['lat', 'lon', 'time_inside/circle_radius', 'acceptance_radius/param[0]',
-                    'loiter_radius/param[2]', 'yaw/param[3]','param[4]' ,'param[5]','altitude/param[6]', 'nav_cmd', 'do_jump_mission_index',
-                    'do_jump_repeat_count', 'union', 'frame', 'origin', 'loiter_exit_xtrack',
-                    'force_heading', 'altitude_is_relative', 'autocontinue', 'vtol_back_transition']
+            stat_headers = ["timestamp", 'current_seq', 'count', 'dataman_id']
+            column_headers = ['lat', 'lon', 'time_inside/circle_radius', 'acceptance_radius/param[0]',
+                        'loiter_radius/param[2]', 'yaw/param[3]','param[4]' ,'param[5]','altitude/param[6]', 'nav_cmd', 'do_jump_mission_index',
+                        'do_jump_repeat_count', 'union', 'frame', 'origin', 'loiter_exit_xtrack',
+                        'force_heading', 'altitude_is_relative', 'autocontinue', 'vtol_back_transition']
 
-        self.tableWidget_status.clearContents()
-        self.tableWidget_point.clearContents()
+            self.tableWidget_status.clearContents()
+            self.tableWidget_point.clearContents()
 
-        self.tableWidget_status.setColumnCount(len(stat_headers))
-        self.tableWidget_status.setRowCount(1)
-        self.tableWidget_status.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_status.setHorizontalHeaderLabels(stat_headers)
-        self.tableWidget_status.verticalHeader().setVisible(False)
+            self.tableWidget_status.setColumnCount(len(stat_headers))
+            self.tableWidget_status.setRowCount(1)
+            self.tableWidget_status.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.tableWidget_status.setHorizontalHeaderLabels(stat_headers)
+            self.tableWidget_status.verticalHeader().setVisible(False)
 
-        self.tableWidget_point.setColumnCount(len(column_headers))
-        self.tableWidget_point.setRowCount(len(waypoints))
-        self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
+            self.tableWidget_point.setColumnCount(len(column_headers))
+            self.tableWidget_point.setRowCount(len(waypoints))
+            self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
 
 
-        for i in range(4):
-            if type(mission[i]) != 'str':
-                mission[i] = str(mission[i])
-            self.tableWidget_status.setItem(0, i, QTableWidgetItem(mission[i]))
+            for i in range(4):
+                if type(mission[i]) != 'str':
+                    mission[i] = str(mission[i])
+                self.tableWidget_status.setItem(0, i, QTableWidgetItem(mission[i]))
 
-        for idx, item in enumerate(waypoints):
-            print(item)
-            for i, num in enumerate(item):
-                if type(num) != "str":
-                    item[i] = str(num)
-                self.tableWidget_point.setItem(idx, i, QTableWidgetItem(item[i]))
-        self.tableWidget_point.resizeRowsToContents()
+            for idx, item in enumerate(waypoints):
+                print(item)
+                for i, num in enumerate(item):
+                    if type(num) != "str":
+                        item[i] = str(num)
+                    self.tableWidget_point.setItem(idx, i, QTableWidgetItem(item[i]))
+            self.tableWidget_point.resizeRowsToContents()
+        except FileNotFoundError as e:
+            print(e)
+            QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
+            pass
+        except AttributeError as a:
+            print(a)
+            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
 def PX4Forensic():
     suppress_qt_warnings()
