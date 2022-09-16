@@ -26,11 +26,9 @@ download_class = uic.loadUiType("ui/downloadProgress.ui")[0]
 class WindowClass(QMainWindow, form_class) :
     def __init__(self) :
         super().__init__()
-        dataman = "./src/dataman"
-        parser_fd = os.open(dataman, os.O_BINARY)
-
         self.setupUi(self)
-        self.parser = missionParser(parser_fd)
+
+
         self.progressbar = QProgressBar()
         self.statusbar.addPermanentWidget(self.progressbar)
         self.step = 0
@@ -56,8 +54,19 @@ class WindowClass(QMainWindow, form_class) :
 
         #self.ftp = FTPReader(_port=None)
         self.ftp = FTPReader(_port=self.mavPort)
-        # Mission - radiobox 트리거 함수 연결
 
+        dataman = "./fs/microsd/dataman"
+        try:
+            parser_fd = os.open(dataman, os.O_BINARY)
+        except FileNotFoundError as e:
+            print(e)
+            self.getFileFromUAV()
+            parser_fd = os.open(dataman, os.O_BINARY)
+            pass
+
+        self.parser = missionParser(parser_fd)
+
+        # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
         self.radio_geofencepoint.toggled.connect(self.geoClicked)
         self.radio_waypoint.toggled.connect(self.wayClicked)
@@ -69,6 +78,9 @@ class WindowClass(QMainWindow, form_class) :
 
 
     def getFileFromUAV(self):
+        self.radio_safepoint.setDisabled(True)
+        self.radio_geofencepoint.setDisabled(True)
+        self.radio_waypoint.setDisabled(True)
         self.dataRefreshButton.setDisabled(True)
         st = []
         root = self.ftp.tree_root
@@ -150,44 +162,51 @@ class WindowClass(QMainWindow, form_class) :
         self.progressbar.setValue(0)
         QApplication.processEvents()
         self.dataRefreshButton.setEnabled(True)
+        self.radio_safepoint.setEnabled(True)
+        self.radio_geofencepoint.setEnabled(True)
+        self.radio_waypoint.setEnabled(True)
 
 
 
     def fileInfo(self, filename):
+        try:
+            fd = os.open(filename, os.O_BINARY)
+        except FileNotFoundError:
+            return
+        fd = os.open(filename, os.O_BINARY)
+        if fd < 0:
+            self.getFileFromUAV()
             fd = os.open(filename, os.O_BINARY)
             if fd < 0:
-                self.getFileFromUAV()
-                fd = os.open(filename, os.O_BINARY)
-                if fd < 0:
-                    return -1
+                return -1
 
-            datamanId = self.parser.get_mission()[3]
-            created = createdTime(filename)
-            hashSha = hash_sha1(filename)
-            hashMD5 = hash_md5(filename)
-            encrypt = is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
-                                   self.parser.get_mission_item(datamanId), self.parser.get_mission())
-            if encrypt == 0:
-                encrypt = "False"
-            elif encrypt ==1 :
-                encrypt = "True"
+        datamanId = self.parser.get_mission()[3]
+        created = createdTime(filename)
+        hashSha = hash_sha1(filename)
+        hashMD5 = hash_md5(filename)
+        encrypt = is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
+                               self.parser.get_mission_item(datamanId), self.parser.get_mission())
+        if encrypt == 0:
+            encrypt = "False"
+        elif encrypt ==1 :
+            encrypt = "True"
 
-            header = ["created", "MD5", "SHA-1", "encrypted"]
-            data = [created, hashSha,hashMD5,encrypt]
+        header = ["created", "MD5", "SHA-1", "encrypted"]
+        data = [created, hashSha,hashMD5,encrypt]
 
-            self.tableWidget_file.setColumnCount(2)
-            self.tableWidget_file.setRowCount(len(header))
-            self.tableWidget_file.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.tableWidget_file.verticalHeader().setVisible(False)
-            self.tableWidget_file.horizontalHeader().setVisible(False)
+        self.tableWidget_file.setColumnCount(2)
+        self.tableWidget_file.setRowCount(len(header))
+        self.tableWidget_file.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tableWidget_file.verticalHeader().setVisible(False)
+        self.tableWidget_file.horizontalHeader().setVisible(False)
 
-            for i in range(len(header)):
-                self.tableWidget_file.setItem(i, 0, QTableWidgetItem(header[i]))
-                self.tableWidget_file.setItem(i, 1, QTableWidgetItem(str(data[i])))
+        for i in range(len(header)):
+            self.tableWidget_file.setItem(i, 0, QTableWidgetItem(header[i]))
+            self.tableWidget_file.setItem(i, 1, QTableWidgetItem(str(data[i])))
 
-            self.tableWidget_file.resizeRowsToContents()
-            self.tableWidget_file.resizeColumnsToContents()
-            os.close(fd)
+        self.tableWidget_file.resizeRowsToContents()
+        self.tableWidget_file.resizeColumnsToContents()
+        os.close(fd)
 
 
     def portCliked(self,port, des):
