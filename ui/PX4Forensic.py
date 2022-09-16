@@ -87,6 +87,7 @@ class WindowClass(QMainWindow, form_class) :
         self.radio_geofencepoint.setDisabled(True)
         self.radio_waypoint.setDisabled(True)
         self.dataRefreshButton.setDisabled(True)
+
         st = []
         root = self.ftp.tree_root
         search_result = []
@@ -165,7 +166,7 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.showMessage("")
         self.statusbar.repaint()
         self.progressbar.setValue(0)
-        dataman = "./fs/microsd/dataman"
+        dataman = "../fs/microsd/dataman"
         try:
             parser_fd = os.open(dataman, os.O_BINARY)
             self.parser = missionParser(parser_fd)
@@ -173,6 +174,7 @@ class WindowClass(QMainWindow, form_class) :
             # 파일 정보 표시
             self.fileInfo(dataman)
         except FileNotFoundError as e:
+            print(os.getcwd())
             self.parser = None
             print(e)
             pass

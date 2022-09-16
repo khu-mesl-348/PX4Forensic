@@ -274,6 +274,10 @@ class missionParser:
 
         missionitem = mission_item_s(0, 0, 0, 0, 0, 0, 0, 0, [0,0,0,0,0,0,0], 0,0,0,0,0,0,0,0,0,0,0)
 
+        if dataman_id != 2 and dataman_id != 3:
+            rseek = os.lseek(self.fd, os.path.getsize("./fs/microsd/dataman") - 14, os.SEEK_SET)
+            dataman_id = struct.unpack('b', os.read(self.fd, 1))[0]
+
         if dataman_id == 2:
             print("\nkey_waypoints_0\n------------------\n")
             dmsize = dm_item_s.DM_KEY_WAYPOINTS_OFFBOARD_0_MAX.value
