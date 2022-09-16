@@ -1,8 +1,8 @@
 import sys
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
-from src.MavPort import MavlinkPort
 from src.FTPReader import FTPReader
+from src.Mission.PyMavlinkCRC32 import crc
 from src.Mission.PX4MissionParser import missionParser
 from src.Mission.tools import SerialPort
 from src.PX4Mission import hash_sha1, hash_md5, createdTime, is_encrypted
@@ -205,13 +205,16 @@ class WindowClass(QMainWindow, form_class) :
         hashMD5 = hash_md5(filename)
         encrypt = is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
                                self.parser.get_mission_item(datamanId), self.parser.get_mission())
+        ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
+        Crc = crc()
+        CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
         if encrypt == 0:
             encrypt = "False"
         elif encrypt ==1 :
             encrypt = "True"
 
-        header = ["created", "MD5", "SHA-1", "encrypted"]
-        data = [created, hashSha,hashMD5,encrypt]
+        header = ["created", "MD5", "SHA-1", "encrypted","CRC"]
+        data = [created, hashSha,hashMD5,encrypt,CrcResult ]
 
         self.tableWidget_file.setColumnCount(2)
         self.tableWidget_file.setRowCount(len(header))
