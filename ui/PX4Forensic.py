@@ -9,6 +9,11 @@ from src.PX4Mission import hash_sha1, hash_md5, createdTime, is_encrypted
 from PyQt5 import uic
 from os import environ
 import os
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from haversine import inverse_haversine, Direction, Unit
+import pandas as pd
+from pandas import Series, DataFrame
 
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
@@ -81,6 +86,85 @@ class WindowClass(QMainWindow, form_class) :
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
 
+        # 그래프 객체 설정
+        self.fig = plt.Figure(figsize=(1,1))
+        self.canvas = FigureCanvas(self.fig)
+        self.graphLayout.addWidget(self.canvas)
+
+    def drawGraph(self, x, y, v, nav_cmd, title):
+        print(x, y)
+
+        self.fig.clf()
+
+
+
+        ax = self.fig.add_subplot(111)
+        ax.set_title(title)
+        if title == "safe points":
+            ax.scatter(x, y)
+            for i in range(len(x)):
+                ax.annotate(i + 1, (x[i], y[i]))
+
+        elif title == "fence points":
+            ax.scatter(x, y)
+            for i in range(len(x)):
+                ax.annotate(i + 1, (x[i], y[i]))
+            idx = 0
+            maxidx = len(x)
+            while idx < maxidx:
+                print(idx, nav_cmd[idx])
+                if nav_cmd[idx] == 5001 or nav_cmd[idx] == 5002:
+                    ax.plot(x[idx:int(idx+v[idx])]+[x[idx]], y[idx:int(idx+v[idx])]+[y[idx]])
+                    idx += int(v[idx])
+
+                elif nav_cmd[idx] == 5003 or nav_cmd[idx] == 5004:
+
+                    radius = float(round(abs(x[idx]-inverse_haversine((x[idx], y[idx]), v[idx], Direction.WEST, unit=Unit.METERS)[0]), 10))
+                    draw_circle = plt.Circle((x[idx], y[idx]), radius, fill=False)
+
+                    x.append(x[idx]+radius)
+                    x.append(x[idx]-radius)
+                    y.append(y[idx] + radius)
+                    y.append(y[idx] - radius)
+                    ax.add_artist(draw_circle)
+                    idx += 1
+
+        elif title == "waypoints":
+            way_x = []
+            way_y = []
+            way_num = []
+            for i,item in enumerate(x):
+                if v[i] == 2:
+                    continue
+                else:
+                    way_x.append(x[i])
+                    way_y.append(y[i])
+                    way_num.append(i)
+
+            ax.scatter(way_x, way_y)
+            ax.plot(way_x,way_y)
+            for i in range(len(way_x)):
+                ax.annotate(way_num[i]+1, (way_x[i], way_y[i]))
+
+            x = way_x
+            y = way_y
+
+
+        print(x, y)
+        x_blank = (max(x) - min(x)) / 10
+        y_blank = (max(y) - min(y)) / 10
+        x_min = min(x) - x_blank
+        x_max = max(x) + x_blank
+        y_min = min(y) - y_blank
+        y_max = max(y) + y_blank
+        ax.grid()
+
+
+        ax.axis([x_min, x_max, y_min, y_max])
+        self.fig.tight_layout()
+        self.canvas.show()
+        self.canvas.draw()
+        return
 
     def getFileFromUAV(self):
         self.radio_safepoint.setDisabled(True)
@@ -260,6 +344,9 @@ class WindowClass(QMainWindow, form_class) :
             self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
             self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
 
+            x = []
+            y = []
+
             print(safePoints)
             for idx, item in enumerate(safePoints):
 
@@ -274,8 +361,12 @@ class WindowClass(QMainWindow, form_class) :
                     self.tableWidget_point.setItem(idx - 1, 1, QTableWidgetItem(item[1]))
                     self.tableWidget_point.setItem(idx - 1, 2, QTableWidgetItem(item[2]))
                     self.tableWidget_point.setItem(idx - 1, 3, QTableWidgetItem(item[3]))
+                    x.append(round(float(item[0]), 7))
+                    y.append(round(float(item[1]), 7))
 
             self.tableWidget_point.resizeRowsToContents()
+            print(x, y)
+            self.drawGraph(x, y, [],[],title='safe points')
 
         except FileNotFoundError as e:
             print(e)
@@ -308,6 +399,10 @@ class WindowClass(QMainWindow, form_class) :
             self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
 
             print(geoPoints)
+            x = []
+            y = []
+            v = []
+            n = []
             for idx, item in enumerate(geoPoints):
                 print(item)
                 for i, num in enumerate(item):
@@ -324,7 +419,13 @@ class WindowClass(QMainWindow, form_class) :
                     self.tableWidget_point.setItem(idx-1, 4, QTableWidgetItem(item[4]))
                     self.tableWidget_point.setItem(idx-1, 5, QTableWidgetItem(item[5]))
 
+                    x.append(round(float(item[0]), 7))
+                    y.append(round(float(item[1]), 7))
+                    v.append(float(item[3]))
+                    n.append(int(item[4]))
+
             self.tableWidget_point.resizeRowsToContents()
+            self.drawGraph(x, y, v, n, "fence points")
         except FileNotFoundError as e:
             print(e)
             QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
@@ -359,6 +460,10 @@ class WindowClass(QMainWindow, form_class) :
             self.tableWidget_point.setEditTriggers(QAbstractItemView.NoEditTriggers)
             self.tableWidget_point.setHorizontalHeaderLabels(column_headers)
 
+            x = []
+            y = []
+            v = []
+            n = []
 
             for i in range(4):
                 if type(mission[i]) != 'str':
@@ -371,7 +476,12 @@ class WindowClass(QMainWindow, form_class) :
                     if type(num) != "str":
                         item[i] = str(num)
                     self.tableWidget_point.setItem(idx, i, QTableWidgetItem(item[i]))
+                x.append(round(float(item[0]), 7))
+                y.append(round(float(item[1]), 7))
+                n.append(int(item[9]))
+                v.append(int(item[13]))
             self.tableWidget_point.resizeRowsToContents()
+            self.drawGraph(x, y, v, n, "waypoints")
         except FileNotFoundError as e:
             print(e)
             QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
