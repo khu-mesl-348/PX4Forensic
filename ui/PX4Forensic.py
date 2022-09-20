@@ -9,6 +9,7 @@ from src.PX4Mission import hash_sha1, hash_md5, createdTime, is_encrypted
 from PyQt5 import uic
 from os import environ
 import os
+from matplotlib import patches
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from haversine import inverse_haversine, Direction, Unit
@@ -119,14 +120,16 @@ class WindowClass(QMainWindow, form_class) :
 
                 elif nav_cmd[idx] == 5003 or nav_cmd[idx] == 5004:
 
-                    radius = float(round(abs(x[idx]-inverse_haversine((x[idx], y[idx]), v[idx], Direction.WEST, unit=Unit.METERS)[0]), 10))
-                    draw_circle = plt.Circle((x[idx], y[idx]), radius, fill=False)
+                    width = float(round(abs(x[idx]-inverse_haversine((y[idx], x[idx]), v[idx], Direction.WEST, unit=Unit.METERS)[1]), 10))
+                    height = float(round(abs(y[idx]-inverse_haversine((y[idx], x[idx]), v[idx], Direction.NORTH, unit=Unit.METERS)[0]), 10))
+                    draw_oval = patches.Ellipse((x[idx], y[idx]), width*2, height*2, fill=False, color='blue')
 
-                    x.append(x[idx]+radius)
-                    x.append(x[idx]-radius)
-                    y.append(y[idx] + radius)
-                    y.append(y[idx] - radius)
-                    ax.add_artist(draw_circle)
+                    print("ih: ",inverse_haversine((y[idx], x[idx]), v[idx], Direction.WEST, unit=Unit.METERS))
+                    x.append(x[idx]+width)
+                    x.append(x[idx]-width)
+                    y.append(y[idx] + height)
+                    y.append(y[idx] - height)
+                    ax.add_patch(draw_oval)
                     idx += 1
 
         elif title == "waypoints":
@@ -361,8 +364,8 @@ class WindowClass(QMainWindow, form_class) :
                     self.tableWidget_point.setItem(idx - 1, 1, QTableWidgetItem(item[1]))
                     self.tableWidget_point.setItem(idx - 1, 2, QTableWidgetItem(item[2]))
                     self.tableWidget_point.setItem(idx - 1, 3, QTableWidgetItem(item[3]))
-                    x.append(round(float(item[0]), 7))
-                    y.append(round(float(item[1]), 7))
+                    y.append(round(float(item[0]), 7))
+                    x.append(round(float(item[1]), 7))
 
             self.tableWidget_point.resizeRowsToContents()
             print(x, y)
@@ -419,8 +422,8 @@ class WindowClass(QMainWindow, form_class) :
                     self.tableWidget_point.setItem(idx-1, 4, QTableWidgetItem(item[4]))
                     self.tableWidget_point.setItem(idx-1, 5, QTableWidgetItem(item[5]))
 
-                    x.append(round(float(item[0]), 7))
-                    y.append(round(float(item[1]), 7))
+                    y.append(round(float(item[0]), 7))
+                    x.append(round(float(item[1]), 7))
                     v.append(float(item[3]))
                     n.append(int(item[4]))
 
@@ -476,8 +479,8 @@ class WindowClass(QMainWindow, form_class) :
                     if type(num) != "str":
                         item[i] = str(num)
                     self.tableWidget_point.setItem(idx, i, QTableWidgetItem(item[i]))
-                x.append(round(float(item[0]), 7))
-                y.append(round(float(item[1]), 7))
+                y.append(round(float(item[0]), 7))
+                x.append(round(float(item[1]), 7))
                 n.append(int(item[9]))
                 v.append(int(item[13]))
             self.tableWidget_point.resizeRowsToContents()
