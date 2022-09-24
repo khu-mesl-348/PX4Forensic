@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>900</width>
-    <height>650</height>
+    <width>902</width>
+    <height>657</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -111,7 +111,7 @@
      </palette>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="tab">
      <attribute name="title">
@@ -341,17 +341,7 @@
        <string>log file</string>
       </property>
      </widget>
-     <widget class="QTableWidget" name="tableWidget_file_2">
-      <property name="geometry">
-       <rect>
-        <x>30</x>
-        <y>40</y>
-        <width>261</width>
-        <height>311</height>
-       </rect>
-      </property>
-     </widget>
-     <widget class="QTableWidget" name="tableWidget_file_3">
+     <widget class="QTableWidget" name="tableWidget_file_log">
       <property name="geometry">
        <rect>
         <x>30</x>
@@ -374,16 +364,6 @@
        <string>file</string>
       </property>
      </widget>
-     <widget class="QTableWidget" name="tableWidget_file_4">
-      <property name="geometry">
-       <rect>
-        <x>400</x>
-        <y>40</y>
-        <width>421</width>
-        <height>181</height>
-       </rect>
-      </property>
-     </widget>
      <widget class="QLabel" name="label_8">
       <property name="geometry">
        <rect>
@@ -397,11 +377,11 @@
        <string>data</string>
       </property>
      </widget>
-     <widget class="QTableWidget" name="tableWidget_file_5">
+     <widget class="QTableWidget" name="tableWidget_log_params">
       <property name="geometry">
        <rect>
         <x>400</x>
-        <y>260</y>
+        <y>280</y>
         <width>421</width>
         <height>101</height>
        </rect>
@@ -411,7 +391,7 @@
       <property name="geometry">
        <rect>
         <x>400</x>
-        <y>220</y>
+        <y>250</y>
         <width>91</width>
         <height>31</height>
        </rect>
@@ -424,7 +404,7 @@
       <property name="geometry">
        <rect>
         <x>400</x>
-        <y>380</y>
+        <y>390</y>
         <width>121</width>
         <height>31</height>
        </rect>
@@ -433,7 +413,7 @@
        <string>log messages</string>
       </property>
      </widget>
-     <widget class="QTableWidget" name="tableWidget_file_6">
+     <widget class="QTableWidget" name="tableWidget_log_messages">
       <property name="geometry">
        <rect>
         <x>400</x>
@@ -446,16 +426,48 @@
      <widget class="QPushButton" name="pushButton">
       <property name="geometry">
        <rect>
-        <x>200</x>
-        <y>300</y>
+        <x>210</x>
+        <y>310</y>
         <width>81</width>
         <height>34</height>
        </rect>
       </property>
       <property name="text">
-       <string>추출</string>
+       <string>그래프 추출</string>
       </property>
      </widget>
+     <widget class="QWidget" name="verticalLayoutWidget_2">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>40</y>
+        <width>421</width>
+        <height>211</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="logGraph"/>
+     </widget>
+     <widget class="QListWidget" name="logFileList">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>30</y>
+        <width>271</width>
+        <height>321</height>
+       </rect>
+      </property>
+     </widget>
+     <zorder>label_6</zorder>
+     <zorder>tableWidget_file_log</zorder>
+     <zorder>label_7</zorder>
+     <zorder>label_8</zorder>
+     <zorder>tableWidget_log_params</zorder>
+     <zorder>label_9</zorder>
+     <zorder>label_10</zorder>
+     <zorder>tableWidget_log_messages</zorder>
+     <zorder>verticalLayoutWidget_2</zorder>
+     <zorder>logFileList</zorder>
+     <zorder>pushButton</zorder>
     </widget>
     <widget class="QWidget" name="tab_3">
      <attribute name="title">
@@ -501,7 +513,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>900</width>
+     <width>902</width>
      <height>22</height>
     </rect>
    </property>

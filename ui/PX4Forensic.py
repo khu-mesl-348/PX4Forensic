@@ -5,7 +5,12 @@ from src.FTPReader import FTPReader
 from src.Mission.PyMavlinkCRC32 import crc
 from src.Mission.PX4MissionParser import missionParser
 from src.Mission.tools import SerialPort
-from src.PX4Mission import hash_sha1, hash_md5, createdTime, is_encrypted
+
+#TODO: mission, logger 파일 검증 함수 분리
+from src.PX4Mission import hash_sha1, hash_md5, createdTime, dataman_is_encrypted #mission
+from src.PX4Log import hash_sha1, hash_md5, createdTime, is_encrypted # logger
+from src.PX4Log import *
+
 from PyQt5 import uic
 from os import environ
 import os
@@ -32,11 +37,11 @@ class WindowClass(QMainWindow, form_class) :
     def __init__(self) :
         super().__init__()
         self.setupUi(self)
-
-
         self.progressbar = QProgressBar()
         self.statusbar.addPermanentWidget(self.progressbar)
         self.step = 0
+        self.modulePath = ""
+        self.tabWidget.currentChanged.connect(self.onChange)
         # port 연결
         serial_list = get_serial_item()
 
@@ -61,12 +66,12 @@ class WindowClass(QMainWindow, form_class) :
         self.ftp = FTPReader(_port=self.mavPort)
 
         dataman = "./fs/microsd/dataman"
+
         try:
             parser_fd = os.open(dataman, os.O_BINARY)
             self.parser = missionParser(parser_fd)
-
-            # 파일 정보 표시
-            self.fileInfo(dataman)
+            # 파일 정보 표시(mission)
+            self.fileInfo(dataman,self.tableWidget_file)
         except FileNotFoundError as e:
             self.parser = None
             print(e)
@@ -74,15 +79,11 @@ class WindowClass(QMainWindow, form_class) :
         except AttributeError as a:
             print(a)
             QMessageBox.about(self, '파일 오류', '파일이 잘못됨.')
-            
-
-
 
         # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
         self.radio_geofencepoint.toggled.connect(self.geoClicked)
         self.radio_waypoint.toggled.connect(self.wayClicked)
-
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
 
@@ -91,13 +92,65 @@ class WindowClass(QMainWindow, form_class) :
         self.canvas = FigureCanvas(self.fig)
         self.graphLayout.addWidget(self.canvas)
 
+
+    def onChange(self):
+        tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
+        if tabIndex == 0:
+            self.modulePath = "./fs/microsd/dataman"
+            
+        elif tabIndex == 1:
+            self.modulePath = "fs/microsd/log/2022-07-18/09_39_09.ulg"
+            #정보 출력
+            self.fileInfo(self.modulePath, self.tableWidget_file_log)
+            self.logParams(self.tableWidget_log_params)
+            self.logMessages(self.tableWidget_log_messages)
+
+            #그래프 출력
+            self.logGraph.addWidget(self.canvas)
+            self.tempLogGraph()
+
+            #데이터 리스트 출력
+            #TODO: input 설정 및 함수로 만들기
+            #임시 로그 데이터 리스트 객체 설정
+            item = QListWidgetItem(self.logFileList)
+            item.setText("baro_device_id")
+            item = QListWidgetItem(self.logFileList)
+            item.setText("baro_alt_meter")
+            item = QListWidgetItem(self.logFileList)
+            item.setText("baro_temp_celcius")
+            item = QListWidgetItem(self.logFileList)
+            item.setText("baro_pressure_pa")
+            item = QListWidgetItem(self.logFileList)
+            item.setText("rho")
+            item = QListWidgetItem(self.logFileList)
+            item.setText("calibration_count")
+
+        elif tabIndex == 2:
+            self.modulePath = "parameter"
+
+
+    #TODO: 경로 수정
+    def tempLogGraph(self):
+        self.fig.clf()
+        ax = self.fig.add_subplot(111)
+        csvpath = 'fs/microsd/log/2022-07-18'
+        csvfile = '09_39_09_vehicle_air_data_0.csv'
+        os.chdir(csvpath)
+        df = pd.read_csv(csvfile)
+        df = df[['timestamp', 'baro_temp_celcius']]
+
+        ax.plot(df['timestamp'], df['baro_temp_celcius'])
+        ax.set_xlabel("timestamp")
+
+        self.fig.tight_layout()
+        self.canvas.show()
+        self.canvas.draw()
+        
+        
     def drawGraph(self, x, y, v, nav_cmd, title):
         print(x, y)
 
         self.fig.clf()
-
-
-
         ax = self.fig.add_subplot(111)
         ax.set_title(title)
         if title == "safe points":
@@ -251,12 +304,14 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.repaint()
         self.progressbar.setValue(0)
         dataman = "../fs/microsd/dataman"
+
         try:
             parser_fd = os.open(dataman, os.O_BINARY)
             self.parser = missionParser(parser_fd)
 
-            # 파일 정보 표시
-            self.fileInfo(dataman)
+            # 파일 정보 표시(mission)
+            self.fileInfo(dataman, self.tableWidget_file)
+
         except FileNotFoundError as e:
             print(os.getcwd())
             self.parser = None
@@ -269,9 +324,7 @@ class WindowClass(QMainWindow, form_class) :
         self.radio_geofencepoint.setEnabled(True)
         self.radio_waypoint.setEnabled(True)
 
-
-
-    def fileInfo(self, filename):
+    def fileInfo(self, filename, table):
         try:
             fd = os.open(filename, os.O_BINARY)
         except FileNotFoundError:
@@ -283,12 +336,17 @@ class WindowClass(QMainWindow, form_class) :
             if fd < 0:
                 return -1
 
-        datamanId = self.parser.get_mission()[3]
+        if "dataman" in filename :
+            datamanId = self.parser.get_mission()[3]
+            encrypt = dataman_is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
+                               self.parser.get_mission_item(datamanId), self.parser.get_mission())
+        if "ulg" in filename:
+            encrypt = is_encrypted(filename)
+
         created = createdTime(filename)
         hashSha = hash_sha1(filename)
         hashMD5 = hash_md5(filename)
-        encrypt = is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
-                               self.parser.get_mission_item(datamanId), self.parser.get_mission())
+        
         ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
         Crc = crc()
         CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
@@ -300,20 +358,50 @@ class WindowClass(QMainWindow, form_class) :
         header = ["created", "MD5", "SHA-1", "encrypted","CRC"]
         data = [created, hashSha,hashMD5,encrypt,CrcResult ]
 
-        self.tableWidget_file.setColumnCount(2)
-        self.tableWidget_file.setRowCount(len(header))
-        self.tableWidget_file.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_file.verticalHeader().setVisible(False)
-        self.tableWidget_file.horizontalHeader().setVisible(False)
+        table.setColumnCount(2)
+        table.setRowCount(len(header))
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setVisible(False)
 
         for i in range(len(header)):
-            self.tableWidget_file.setItem(i, 0, QTableWidgetItem(header[i]))
-            self.tableWidget_file.setItem(i, 1, QTableWidgetItem(str(data[i])))
+            table.setItem(i, 0, QTableWidgetItem(header[i]))
+            table.setItem(i, 1, QTableWidgetItem(str(data[i])))
 
-        self.tableWidget_file.resizeRowsToContents()
-        self.tableWidget_file.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        table.resizeColumnsToContents()
         os.close(fd)
 
+    #TODO: 파일 선택 창 구현 및 파라미터 filename 추가
+    def logParams(self, table):
+        _list = shell_log_params()
+        table.setColumnCount(2)
+        table.setRowCount(len(shell_log_params()))
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setVisible(False)
+
+        for i in range(len(_list)):
+            table.setItem(i, 0, QTableWidgetItem(_list[i][0]))
+            table.setItem(i, 1, QTableWidgetItem(str(_list[i][1])))
+
+        table.resizeRowsToContents()
+        table.resizeColumnsToContents()
+
+    def logMessages(self, table):
+        _list = shell_log_messages()
+        table.setColumnCount(1)
+        table.setRowCount(len(_list))
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setVisible(False)
+        
+        for i in range(len(_list)):
+            table.setItem(i, 0, QTableWidgetItem(_list[i]))
+  
+
+        table.resizeRowsToContents()
+        table.resizeColumnsToContents()
 
     def portCliked(self,port, des):
         if self.mavPort == None or port == "close":

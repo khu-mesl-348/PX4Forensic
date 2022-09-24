@@ -38,7 +38,7 @@ class missionParser:
             return -1
         if index >= self.g_per_item_max_index[item]:
             return -1
-        return self.g_key_offsets[item] + (index * self.g_per_item_size[item]);
+        return self.g_key_offsets[item] + (index * self.g_per_item_size[item])
 
 
 
@@ -56,7 +56,7 @@ class missionParser:
             return -1
 
         buffer = [0 for i in range(self.g_per_item_size[item])]
-        offset = self.calculate_offset(item, index);
+        offset = self.calculate_offset(item, index)
         #print(f"index: {index}, offset: {hex(offset)}")
 
         if offset < 0:
@@ -240,11 +240,11 @@ class missionParser:
 
                     else:
                         current_seq += 1
-                        vertex_count_temp -= 1;
+                        vertex_count_temp -= 1
                         print(
                             f"vertex: {mission_fence_point.vertex_count}, nav_cmd: {mission_fence_point.nav_cmd}, frame: {mission_fence_point.frame}");
                         if vertex_count_temp == 0:
-                            print("\n");
+                            print("\n")
 
             elif mission_fence_point.nav_cmd == NAV_CMD.FENCE_POLYGON_VERTEX_EXCLUSION.value or mission_fence_point.nav_cmd == NAV_CMD.FENCE_POLYGON_VERTEX_INCLUSION.value:
                 if is_circle_area == 0 and mission_fence_point.vertex_count == 0:
@@ -256,10 +256,10 @@ class missionParser:
 
                     else:
                         current_seq += 1
-                        vertex_count_temp -= 1;
+                        vertex_count_temp -= 1
                         print(f"vertex: {mission_fence_point.vertex_count}, nav_cmd: {mission_fence_point.nav_cmd}, frame: {mission_fence_point.frame}");
                         if vertex_count_temp == 0:
-                            print("\n");
+                            print("\n")
 
             else:
                 print(f"unhandled Fence command: {mission_fence_point.nav_cmd}")
@@ -304,7 +304,7 @@ class missionParser:
     def get_mission(self):
         mission = mission_s(0,0,0,0)
         ret = self.dmread(dm_item_t.DM_KEY_MISSION_STATE.value, 0, mission, dm_size.MISSION_STATE_SIZE.value)
-        print("\nkey_mission_state\n------------------");
+        print("\nkey_mission_state\n------------------")
 
         if ret == dm_size.MISSION_STATE_SIZE.value:
             if mission.timestamp != 0 and mission.dataman_id == dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_0.value or mission.dataman_id == dm_item_t.DM_KEY_WAYPOINTS_OFFBOARD_1.value:
@@ -316,7 +316,7 @@ class missionParser:
         return mission.getItem()
 
     def get_key_compat(self):
-        print("\nkey_compat\n------------------");
+        print("\nkey_compat\n------------------")
         key_compat = dataman_compat_s(0)
         ret = self.dmread(dm_item_t.DM_KEY_COMPAT.value, 0, key_compat, dm_size.KEY_COMPAT_SIZE.value)
         if ret == dm_size.KEY_COMPAT_SIZE.value:
