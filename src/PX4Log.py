@@ -7,9 +7,10 @@
 4. 로그 파일 시각화
 
 '''
+
 import hashlib
 import os.path, time
-from src.Logger.PX4LogParser import *
+#from src.Logger.PX4LogParser import *
 
 def hash_sha1(filepath, blocksize=8192):
     sha_1 = hashlib.sha1()
@@ -50,11 +51,11 @@ def is_encrypted(filepath):
         print("file open error", e)
         return
    
-    a = Header(data)
-    if a.magic_number == (85, 76, 111, 103, 1, 18, 53):
-        return 0
-    else:
-        return 1
+    # #a = Header(data)
+    # if a.magic_number == (85, 76, 111, 103, 1, 18, 53):
+    #     return 0
+    # else:
+    #     return 1
 
 
 

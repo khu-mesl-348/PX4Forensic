@@ -43,8 +43,6 @@ def SerialPort(port='auto'):
         print('Aborting')
         return
 
-
-
     return mav_serialport
 
 

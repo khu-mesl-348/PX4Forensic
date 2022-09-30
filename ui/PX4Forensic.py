@@ -1,4 +1,5 @@
 import sys
+import os.path
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
@@ -9,7 +10,7 @@ from src.Mission.tools import SerialPort
 #TODO: mission, logger 파일 검증 함수 분리
 from src.PX4Mission import hash_sha1, hash_md5, createdTime, dataman_is_encrypted #mission
 from src.PX4Log import hash_sha1, hash_md5, createdTime, is_encrypted # logger
-from src.PX4Log import *
+from src.Logger.PX4LogParser import *
 
 from PyQt5 import uic
 from os import environ
@@ -25,7 +26,6 @@ def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 �
     environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     environ["QT_SCREEN_SCALE_FACTORS"] = "1"
     environ["QT_SCALE_FACTOR"] = "1"
-
 
 #UI파일 연결
 #단, UI파일은 Python 코드 파일과 같은 디렉토리에 위치해야한다.
@@ -92,6 +92,27 @@ class WindowClass(QMainWindow, form_class) :
         self.canvas = FigureCanvas(self.fig)
         self.graphLayout.addWidget(self.canvas)
 
+    def LogFile(self):
+        _log_list = searchLogFile()
+
+        for i in range(len(_log_list)):
+            item = QListWidgetItem(self.logFileList)
+            _file_name = _log_list[i].split("\\")
+            item.setText(str(_file_name[2]))
+
+        # item = QListWidgetItem(self.logFileList)
+        # item.setText("baro_device_id")
+        # item = QListWidgetItem(self.logFileList)
+        # item.setText("baro_alt_meter")
+        # item = QListWidgetItem(self.logFileList)
+        # item.setText("baro_temp_celcius")
+        # item = QListWidgetItem(self.logFileList)
+        # item.setText("baro_pressure_pa")
+        # item = QListWidgetItem(self.logFileList)
+        # item.setText("rho")
+        # item = QListWidgetItem(self.logFileList)
+        # item.setText("calibration_count")
+
 
     def onChange(self):
         tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
@@ -99,11 +120,11 @@ class WindowClass(QMainWindow, form_class) :
             self.modulePath = "./fs/microsd/dataman"
             
         elif tabIndex == 1:
-            self.modulePath = "fs/microsd/log/2022-07-18/09_39_09.ulg"
+            self.modulePath = "./fs/microsd/log/2022-07-18/09_39_09.ulg"            
             #정보 출력
             self.fileInfo(self.modulePath, self.tableWidget_file_log)
-            self.logParams(self.tableWidget_log_params)
-            self.logMessages(self.tableWidget_log_messages)
+            self.logParams(self.tableWidget_log_params, self.modulePath)
+            self.logMessages(self.tableWidget_log_messages, self.modulePath)
 
             #그래프 출력
             self.logGraph.addWidget(self.canvas)
@@ -112,18 +133,9 @@ class WindowClass(QMainWindow, form_class) :
             #데이터 리스트 출력
             #TODO: input 설정 및 함수로 만들기
             #임시 로그 데이터 리스트 객체 설정
-            item = QListWidgetItem(self.logFileList)
-            item.setText("baro_device_id")
-            item = QListWidgetItem(self.logFileList)
-            item.setText("baro_alt_meter")
-            item = QListWidgetItem(self.logFileList)
-            item.setText("baro_temp_celcius")
-            item = QListWidgetItem(self.logFileList)
-            item.setText("baro_pressure_pa")
-            item = QListWidgetItem(self.logFileList)
-            item.setText("rho")
-            item = QListWidgetItem(self.logFileList)
-            item.setText("calibration_count")
+            self.LogFile()
+            
+            
 
         elif tabIndex == 2:
             self.modulePath = "parameter"
@@ -373,10 +385,10 @@ class WindowClass(QMainWindow, form_class) :
         os.close(fd)
 
     #TODO: 파일 선택 창 구현 및 파라미터 filename 추가
-    def logParams(self, table):
-        _list = shell_log_params()
+    def logParams(self, table, filepath):
+        _list = shell_log_params(filepath)
         table.setColumnCount(2)
-        table.setRowCount(len(shell_log_params()))
+        table.setRowCount(len(_list))
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.verticalHeader().setVisible(False)
         table.horizontalHeader().setVisible(False)
@@ -388,8 +400,8 @@ class WindowClass(QMainWindow, form_class) :
         table.resizeRowsToContents()
         table.resizeColumnsToContents()
 
-    def logMessages(self, table):
-        _list = shell_log_messages()
+    def logMessages(self, table, filepath):
+        _list = shell_log_messages(filepath)
         table.setColumnCount(1)
         table.setRowCount(len(_list))
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -399,7 +411,6 @@ class WindowClass(QMainWindow, form_class) :
         for i in range(len(_list)):
             table.setItem(i, 0, QTableWidgetItem(_list[i]))
   
-
         table.resizeRowsToContents()
         table.resizeColumnsToContents()
 

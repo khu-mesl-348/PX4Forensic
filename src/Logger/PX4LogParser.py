@@ -11,8 +11,19 @@ import matplotlib.pyplot as plt
 # os.system('ulog_params fs/microsd/log/2022-07-18/09_39_09.ulg') #params
 
 # os.system('ulog_messages fs/microsd/log/2022-07-18/09_39_09.ulg') # log message
+filepath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log" #절대경로
 
-path = "fs/microsd/log/2022-07-18/09_39_09.ulg" #path 수정 필요
+def searchLogFile():
+    print(os.path.realpath(__file__))
+    print_log_list = []
+    for dir in os.listdir(filepath):
+        d = os.path.join(filepath, dir)
+        if os.path.isdir(d):
+            for file in os.listdir(d):
+                f = os.path.join(d, file)
+                print_log_list.append(f)
+    return(print_log_list)
+
 
 def byte_to_string(data):
         _string = ""
@@ -32,10 +43,9 @@ def byte_to_string(data):
 def shell_log_info():
     return 0
 
-def shell_log_params():
-
+def shell_log_params(filepath):
     _listData = []
-    cmd = ['ulog_params', 'fs/microsd/log/2022-07-18/09_39_09.ulg']
+    cmd = ['ulog_params', filepath]
     fd_popen = subprocess.Popen(cmd, stdout= subprocess.PIPE).stdout
     data = fd_popen.read().strip()
     stringData = byte_to_string(data)
@@ -48,9 +58,9 @@ def shell_log_params():
     return _listData
 
 
-def shell_log_messages():
+def shell_log_messages(filepath):
 
-    cmd = ['ulog_messages', 'fs/microsd/log/2022-07-18/09_39_09.ulg']
+    cmd = ['ulog_messages', filepath]
     fd_popen = subprocess.Popen(cmd, stdout= subprocess.PIPE).stdout
     data = fd_popen.read().strip()
     stringData = byte_to_string(data)
@@ -60,10 +70,10 @@ def shell_log_messages():
     return listData
 
 
-def shell_ulog_2_csv():
+def shell_ulog_2_csv(filepath):
     # os.system('ulog2csv fs/microsd/log/2022-07-18/09_39_09.ulg')
     with open('output.txt', 'wb') as f:
-        out = subprocess.run(['ulog2csv', 'fs/microsd/log/2022-07-18/09_39_09.ulg'], capture_output=True, text = True)
+        out = subprocess.run(['ulog2csv', filepath], capture_output=True, text = True)
         f.write(out.stdout)
 
 #ULog 파일 헤더
