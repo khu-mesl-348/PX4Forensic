@@ -4,24 +4,26 @@ import bson
 import struct
 
 # load_json: json 파일을 불러오는 함수
-# @input: json 파일 경로
+# @input: json.xz 파일 경로
 # @output: json 객체
 def load_json(path):
     # etc/extras/parameters.json
     prm = lzma.open(path, "r").read()
     param_json = json.loads(prm)
-    for param in param_json['parameters']:
-        print(param)
+    return param_json
 
 # bson 파일을 불러오는 함수
 # @input: json 파일 경로
 # @output: json 객체
 # fs/parameters_backup.json
 def load_bson(path):
-    bs_prm = open("../../fs/microsd/parameters_backup.bson","rb").read()
+    bs_prm = open(path,"rb").read()
     data = bs_prm
     bs_ld = bson.loads(data)
-    return bs_ld
+    res = []
+    for item in bs_ld:
+        res.append({'name': item, 'value': bs_ld[item]})
+    return res
 
 def load_mtd(path):
     return
@@ -31,4 +33,3 @@ def load_mtd(path):
 
 
 
-load_json("../../etc/extras/parameters.json.xz")

@@ -15,7 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from haversine import inverse_haversine, Direction, Unit
 import pandas as pd
 from pandas import Series, DataFrame
-
+from PX4ForensicParamaeter import Parameterclass
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
     environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
@@ -34,7 +34,7 @@ class WindowClass(QMainWindow, form_class) :
         super().__init__()
         self.setupUi(self)
 
-
+        self.parameter_ui = Parameterclass(self.parameterList, self.parameterDescription, self.parameterValue, self.paramaterRange, self.parameterInformation)
         self.progressbar = QProgressBar()
         self.statusbar.addPermanentWidget(self.progressbar)
         self.step = 0
