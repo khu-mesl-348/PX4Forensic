@@ -12,6 +12,13 @@ from src.PX4Mission import hash_sha1, hash_md5, createdTime, dataman_is_encrypte
 from src.PX4Log import hash_sha1, hash_md5, createdTime, is_encrypted # logger
 from src.Logger.PX4LogParser import *
 
+import csv
+from PyQt5.QtGui import QStandardItemModel
+from PyQt5.QtGui import QStandardItem
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import QVariant
+
 from PyQt5 import uic
 from os import environ
 import os
@@ -42,6 +49,7 @@ class WindowClass(QMainWindow, form_class) :
         self.step = 0
         self.modulePath = ""
         self.tabWidget.currentChanged.connect(self.onChange)
+
         # port 연결
         serial_list = get_serial_item()
 
@@ -92,35 +100,13 @@ class WindowClass(QMainWindow, form_class) :
         self.canvas = FigureCanvas(self.fig)
         self.graphLayout.addWidget(self.canvas)
 
-    def LogFile(self):
-        _log_list = searchLogFile()
-
-        for i in range(len(_log_list)):
-            item = QListWidgetItem(self.logFileList)
-            _file_name = _log_list[i].split("\\")
-            item.setText(str(_file_name[2]))
-
-        # item = QListWidgetItem(self.logFileList)
-        # item.setText("baro_device_id")
-        # item = QListWidgetItem(self.logFileList)
-        # item.setText("baro_alt_meter")
-        # item = QListWidgetItem(self.logFileList)
-        # item.setText("baro_temp_celcius")
-        # item = QListWidgetItem(self.logFileList)
-        # item.setText("baro_pressure_pa")
-        # item = QListWidgetItem(self.logFileList)
-        # item.setText("rho")
-        # item = QListWidgetItem(self.logFileList)
-        # item.setText("calibration_count")
-
-
     def onChange(self):
         tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
         if tabIndex == 0:
             self.modulePath = "./fs/microsd/dataman"
             
         elif tabIndex == 1:
-            self.modulePath = "./fs/microsd/log/2022-07-18/09_39_09.ulg"            
+            self.modulePath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"            
             #정보 출력
             self.fileInfo(self.modulePath, self.tableWidget_file_log)
             self.logParams(self.tableWidget_log_params, self.modulePath)
@@ -133,19 +119,16 @@ class WindowClass(QMainWindow, form_class) :
             #데이터 리스트 출력
             #TODO: input 설정 및 함수로 만들기
             #임시 로그 데이터 리스트 객체 설정
-            self.LogFile()
+            LogForm(self.treeView)
             
-            
-
         elif tabIndex == 2:
             self.modulePath = "parameter"
-
 
     #TODO: 경로 수정
     def tempLogGraph(self):
         self.fig.clf()
         ax = self.fig.add_subplot(111)
-        csvpath = 'fs/microsd/log/2022-07-18'
+        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
         csvfile = '09_39_09_vehicle_air_data_0.csv'
         os.chdir(csvpath)
         df = pd.read_csv(csvfile)
@@ -156,8 +139,7 @@ class WindowClass(QMainWindow, form_class) :
 
         self.fig.tight_layout()
         self.canvas.show()
-        self.canvas.draw()
-        
+        self.canvas.draw()    
         
     def drawGraph(self, x, y, v, nav_cmd, title):
         print(x, y)
@@ -588,6 +570,85 @@ class WindowClass(QMainWindow, form_class) :
         except AttributeError as a:
             print(a)
             QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+
+#로그 파일 리스트
+class Model(QStandardItemModel):
+    def __init__(self, log_data):
+        QStandardItemModel.__init__(self)
+
+        for i in range(len(log_data)):
+            d = log_data[i]
+            item = QStandardItem(d["type"])
+            for j in range(len(d["objects"])):
+                child = QStandardItem(d["objects"][j])
+                item.appendRow(child)
+            self.setItem(i, 0, item)
+
+    def data(self, QModelIndex, role=None):
+        data = self.itemData(QModelIndex)
+        if role == Qt.DisplayRole:
+            ret = data[role]
+        elif role in data and role == Qt.DecorationRole:
+            ret = QPixmap(data[role]).scaledToHeight(25)
+        else:
+            ret = QVariant()
+        return ret
+
+#TODO: 09_39_09 삭제 -> 다른 방법으로 변환
+class LogForm(QWidget):
+    def readCSV(self, filename):
+            f = open(filename, 'r', encoding="utf-8")
+            obj = csv.reader(f)
+            cnt = 0
+
+            for line in obj:
+                cnt = 1
+                result = line
+                if cnt == 1:
+                    break
+
+            return result
+
+    def __init__(self, tv):
+        QWidget.__init__(self, flags = Qt.Widget)
+
+        log_data = []
+        self._log_list = searchLogFile()
+        for i in range(len(self._log_list)):
+            dic_data = {}
+            _file_name = self._log_list[i]
+
+            if(_file_name.find('csv') != -1):
+                _tmp_file_name = _file_name.replace('.csv', '')
+                _tmp_file_name = _tmp_file_name.replace('09_39_09_', '')
+                result = self.readCSV(_file_name)
+                dic_data["type"] = _tmp_file_name.split("\\")[2]
+                dic_data["objects"] = result
+                log_data.append(dic_data)
+
+        tv.setEditTriggers(QAbstractItemView.DoubleClicked)
+
+        model = Model(log_data)
+        tv.setModel(model)
+
+    def LogGraph(self, QModelIndex):
+        data = self.model.itemData(QModelIndex)
+
+        self.fig.clf()
+        ax = self.fig.add_subplot(111)
+        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
+        # csvfile = '09_39_09_vehicle_air_data_0.csv'
+
+        # os.chdir(csvpath)
+        # df = pd.read_csv(csvfile)
+        # df = df[['timestamp', 'baro_temp_celcius']]
+
+        # ax.plot(df['timestamp'], df['baro_temp_celcius'])
+        # ax.set_xlabel("timestamp")
+
+        # self.fig.tight_layout()
+        # self.canvas.show()
+        # self.canvas.draw()   
 
 def PX4Forensic():
     suppress_qt_warnings()

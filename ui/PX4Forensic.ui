@@ -344,18 +344,18 @@
      <widget class="QTableWidget" name="tableWidget_file_log">
       <property name="geometry">
        <rect>
-        <x>30</x>
-        <y>410</y>
-        <width>261</width>
-        <height>111</height>
+        <x>400</x>
+        <y>320</y>
+        <width>421</width>
+        <height>101</height>
        </rect>
       </property>
      </widget>
      <widget class="QLabel" name="label_7">
       <property name="geometry">
        <rect>
-        <x>30</x>
-        <y>370</y>
+        <x>400</x>
+        <y>290</y>
         <width>91</width>
         <height>31</height>
        </rect>
@@ -380,18 +380,18 @@
      <widget class="QTableWidget" name="tableWidget_log_params">
       <property name="geometry">
        <rect>
-        <x>400</x>
-        <y>280</y>
-        <width>421</width>
-        <height>101</height>
+        <x>30</x>
+        <y>450</y>
+        <width>261</width>
+        <height>81</height>
        </rect>
       </property>
      </widget>
      <widget class="QLabel" name="label_9">
       <property name="geometry">
        <rect>
-        <x>400</x>
-        <y>250</y>
+        <x>30</x>
+        <y>420</y>
         <width>91</width>
         <height>31</height>
        </rect>
@@ -404,7 +404,7 @@
       <property name="geometry">
        <rect>
         <x>400</x>
-        <y>390</y>
+        <y>430</y>
         <width>121</width>
         <height>31</height>
        </rect>
@@ -417,23 +417,10 @@
       <property name="geometry">
        <rect>
         <x>400</x>
-        <y>420</y>
+        <y>460</y>
         <width>421</width>
-        <height>101</height>
+        <height>61</height>
        </rect>
-      </property>
-     </widget>
-     <widget class="QPushButton" name="pushButton">
-      <property name="geometry">
-       <rect>
-        <x>210</x>
-        <y>310</y>
-        <width>81</width>
-        <height>34</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>그래프 추출</string>
       </property>
      </widget>
      <widget class="QWidget" name="verticalLayoutWidget_2">
@@ -442,32 +429,21 @@
         <x>400</x>
         <y>40</y>
         <width>421</width>
-        <height>211</height>
+        <height>251</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="logGraph"/>
      </widget>
-     <widget class="QListWidget" name="logFileList">
+     <widget class="QTreeView" name="treeView">
       <property name="geometry">
        <rect>
         <x>30</x>
-        <y>30</y>
-        <width>271</width>
-        <height>321</height>
+        <y>40</y>
+        <width>261</width>
+        <height>381</height>
        </rect>
       </property>
      </widget>
-     <zorder>label_6</zorder>
-     <zorder>tableWidget_file_log</zorder>
-     <zorder>label_7</zorder>
-     <zorder>label_8</zorder>
-     <zorder>tableWidget_log_params</zorder>
-     <zorder>label_9</zorder>
-     <zorder>label_10</zorder>
-     <zorder>tableWidget_log_messages</zorder>
-     <zorder>verticalLayoutWidget_2</zorder>
-     <zorder>logFileList</zorder>
-     <zorder>pushButton</zorder>
     </widget>
     <widget class="QWidget" name="tab_3">
      <attribute name="title">

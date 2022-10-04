@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 filepath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log" #절대경로
 
 def searchLogFile():
-    print(os.path.realpath(__file__))
     print_log_list = []
     for dir in os.listdir(filepath):
         d = os.path.join(filepath, dir)
@@ -22,6 +21,7 @@ def searchLogFile():
             for file in os.listdir(d):
                 f = os.path.join(d, file)
                 print_log_list.append(f)
+                
     return(print_log_list)
 
 
