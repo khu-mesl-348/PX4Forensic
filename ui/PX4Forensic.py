@@ -1,11 +1,24 @@
 import sys
+import os.path
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
 from src.Mission.PyMavlinkCRC32 import crc
 from src.Mission.PX4MissionParser import missionParser
 from src.Mission.tools import SerialPort
-from src.PX4Mission import hash_sha1, hash_md5, createdTime, is_encrypted
+
+#TODO: mission, logger 파일 검증 함수 분리
+from src.PX4Mission import hash_sha1, hash_md5, createdTime, dataman_is_encrypted #mission
+from src.PX4Log import hash_sha1, hash_md5, createdTime, is_encrypted # logger
+from src.Logger.PX4LogParser import *
+
+import csv
+from PyQt5.QtGui import QStandardItemModel
+from PyQt5.QtGui import QStandardItem
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import QVariant
+
 from PyQt5 import uic
 from os import environ
 import os
@@ -22,7 +35,6 @@ def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 �
     environ["QT_SCREEN_SCALE_FACTORS"] = "1"
     environ["QT_SCALE_FACTOR"] = "1"
 
-
 #UI파일 연결
 #단, UI파일은 Python 코드 파일과 같은 디렉토리에 위치해야한다.
 form_class = uic.loadUiType("ui/PX4Forensic.ui")[0]
@@ -34,10 +46,15 @@ class WindowClass(QMainWindow, form_class) :
         super().__init__()
         self.setupUi(self)
 
+
         self.parameter_ui = Parameterclass(self.parameterList, self.parameterDescription, self.parameterValue, self.paramaterRange, self.parameterInformation)
+
         self.progressbar = QProgressBar()
         self.statusbar.addPermanentWidget(self.progressbar)
         self.step = 0
+        self.modulePath = ""
+        self.tabWidget.currentChanged.connect(self.onChange)
+
         # port 연결
         serial_list = get_serial_item()
 
@@ -62,12 +79,12 @@ class WindowClass(QMainWindow, form_class) :
         self.ftp = FTPReader(_port=self.mavPort)
 
         dataman = "./fs/microsd/dataman"
+
         try:
             parser_fd = os.open(dataman, os.O_BINARY)
             self.parser = missionParser(parser_fd)
-
-            # 파일 정보 표시
-            self.fileInfo(dataman)
+            # 파일 정보 표시(mission)
+            self.fileInfo(dataman,self.tableWidget_file)
         except FileNotFoundError as e:
             self.parser = None
             print(e)
@@ -75,15 +92,11 @@ class WindowClass(QMainWindow, form_class) :
         except AttributeError as a:
             print(a)
             QMessageBox.about(self, '파일 오류', '파일이 잘못됨.')
-            
-
-
 
         # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
         self.radio_geofencepoint.toggled.connect(self.geoClicked)
         self.radio_waypoint.toggled.connect(self.wayClicked)
-
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
 
@@ -92,13 +105,51 @@ class WindowClass(QMainWindow, form_class) :
         self.canvas = FigureCanvas(self.fig)
         self.graphLayout.addWidget(self.canvas)
 
+    def onChange(self):
+        tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
+        if tabIndex == 0:
+            self.modulePath = "./fs/microsd/dataman"
+            
+        elif tabIndex == 1:
+            self.modulePath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"            
+            #정보 출력
+            self.fileInfo(self.modulePath, self.tableWidget_file_log)
+            self.logParams(self.tableWidget_log_params, self.modulePath)
+            self.logMessages(self.tableWidget_log_messages, self.modulePath)
+
+            #그래프 출력
+            self.logGraph.addWidget(self.canvas)
+            self.tempLogGraph()
+
+            #데이터 리스트 출력
+            #TODO: input 설정 및 함수로 만들기
+            #임시 로그 데이터 리스트 객체 설정
+            LogForm(self.treeView)
+            
+        elif tabIndex == 2:
+            self.modulePath = "parameter"
+
+    #TODO: 경로 수정
+    def tempLogGraph(self):
+        self.fig.clf()
+        ax = self.fig.add_subplot(111)
+        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
+        csvfile = '09_39_09_vehicle_air_data_0.csv'
+        os.chdir(csvpath)
+        df = pd.read_csv(csvfile)
+        df = df[['timestamp', 'baro_temp_celcius']]
+
+        ax.plot(df['timestamp'], df['baro_temp_celcius'])
+        ax.set_xlabel("timestamp")
+
+        self.fig.tight_layout()
+        self.canvas.show()
+        self.canvas.draw()    
+        
     def drawGraph(self, x, y, v, nav_cmd, title):
         print(x, y)
 
         self.fig.clf()
-
-
-
         ax = self.fig.add_subplot(111)
         ax.set_title(title)
         if title == "safe points":
@@ -254,12 +305,14 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.repaint()
         self.progressbar.setValue(0)
         dataman = "../fs/microsd/dataman"
+
         try:
             parser_fd = os.open(dataman, os.O_BINARY)
             self.parser = missionParser(parser_fd)
 
-            # 파일 정보 표시
-            self.fileInfo(dataman)
+            # 파일 정보 표시(mission)
+            self.fileInfo(dataman, self.tableWidget_file)
+
         except FileNotFoundError as e:
             print(os.getcwd())
             self.parser = None
@@ -272,9 +325,7 @@ class WindowClass(QMainWindow, form_class) :
         self.radio_geofencepoint.setEnabled(True)
         self.radio_waypoint.setEnabled(True)
 
-
-
-    def fileInfo(self, filename):
+    def fileInfo(self, filename, table):
         try:
             fd = os.open(filename, os.O_BINARY)
         except FileNotFoundError:
@@ -286,12 +337,17 @@ class WindowClass(QMainWindow, form_class) :
             if fd < 0:
                 return -1
 
-        datamanId = self.parser.get_mission()[3]
+        if "dataman" in filename :
+            datamanId = self.parser.get_mission()[3]
+            encrypt = dataman_is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
+                               self.parser.get_mission_item(datamanId), self.parser.get_mission())
+        if "ulg" in filename:
+            encrypt = is_encrypted(filename)
+
         created = createdTime(filename)
         hashSha = hash_sha1(filename)
         hashMD5 = hash_md5(filename)
-        encrypt = is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
-                               self.parser.get_mission_item(datamanId), self.parser.get_mission())
+        
         ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
         Crc = crc()
         CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
@@ -303,20 +359,49 @@ class WindowClass(QMainWindow, form_class) :
         header = ["created", "MD5", "SHA-1", "encrypted","CRC"]
         data = [created, hashSha,hashMD5,encrypt,CrcResult ]
 
-        self.tableWidget_file.setColumnCount(2)
-        self.tableWidget_file.setRowCount(len(header))
-        self.tableWidget_file.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tableWidget_file.verticalHeader().setVisible(False)
-        self.tableWidget_file.horizontalHeader().setVisible(False)
+        table.setColumnCount(2)
+        table.setRowCount(len(header))
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setVisible(False)
 
         for i in range(len(header)):
-            self.tableWidget_file.setItem(i, 0, QTableWidgetItem(header[i]))
-            self.tableWidget_file.setItem(i, 1, QTableWidgetItem(str(data[i])))
+            table.setItem(i, 0, QTableWidgetItem(header[i]))
+            table.setItem(i, 1, QTableWidgetItem(str(data[i])))
 
-        self.tableWidget_file.resizeRowsToContents()
-        self.tableWidget_file.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        table.resizeColumnsToContents()
         os.close(fd)
 
+    #TODO: 파일 선택 창 구현 및 파라미터 filename 추가
+    def logParams(self, table, filepath):
+        _list = shell_log_params(filepath)
+        table.setColumnCount(2)
+        table.setRowCount(len(_list))
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setVisible(False)
+
+        for i in range(len(_list)):
+            table.setItem(i, 0, QTableWidgetItem(_list[i][0]))
+            table.setItem(i, 1, QTableWidgetItem(str(_list[i][1])))
+
+        table.resizeRowsToContents()
+        table.resizeColumnsToContents()
+
+    def logMessages(self, table, filepath):
+        _list = shell_log_messages(filepath)
+        table.setColumnCount(1)
+        table.setRowCount(len(_list))
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setVisible(False)
+        
+        for i in range(len(_list)):
+            table.setItem(i, 0, QTableWidgetItem(_list[i]))
+  
+        table.resizeRowsToContents()
+        table.resizeColumnsToContents()
 
     def portCliked(self,port, des):
         if self.mavPort == None or port == "close":
@@ -492,6 +577,85 @@ class WindowClass(QMainWindow, form_class) :
         except AttributeError as a:
             print(a)
             QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+
+#로그 파일 리스트
+class Model(QStandardItemModel):
+    def __init__(self, log_data):
+        QStandardItemModel.__init__(self)
+
+        for i in range(len(log_data)):
+            d = log_data[i]
+            item = QStandardItem(d["type"])
+            for j in range(len(d["objects"])):
+                child = QStandardItem(d["objects"][j])
+                item.appendRow(child)
+            self.setItem(i, 0, item)
+
+    def data(self, QModelIndex, role=None):
+        data = self.itemData(QModelIndex)
+        if role == Qt.DisplayRole:
+            ret = data[role]
+        elif role in data and role == Qt.DecorationRole:
+            ret = QPixmap(data[role]).scaledToHeight(25)
+        else:
+            ret = QVariant()
+        return ret
+
+#TODO: 09_39_09 삭제 -> 다른 방법으로 변환
+class LogForm(QWidget):
+    def readCSV(self, filename):
+            f = open(filename, 'r', encoding="utf-8")
+            obj = csv.reader(f)
+            cnt = 0
+
+            for line in obj:
+                cnt = 1
+                result = line
+                if cnt == 1:
+                    break
+
+            return result
+
+    def __init__(self, tv):
+        QWidget.__init__(self, flags = Qt.Widget)
+
+        log_data = []
+        self._log_list = searchLogFile()
+        for i in range(len(self._log_list)):
+            dic_data = {}
+            _file_name = self._log_list[i]
+
+            if(_file_name.find('csv') != -1):
+                _tmp_file_name = _file_name.replace('.csv', '')
+                _tmp_file_name = _tmp_file_name.replace('09_39_09_', '')
+                result = self.readCSV(_file_name)
+                dic_data["type"] = _tmp_file_name.split("\\")[2]
+                dic_data["objects"] = result
+                log_data.append(dic_data)
+
+        tv.setEditTriggers(QAbstractItemView.DoubleClicked)
+
+        model = Model(log_data)
+        tv.setModel(model)
+
+    def LogGraph(self, QModelIndex):
+        data = self.model.itemData(QModelIndex)
+
+        self.fig.clf()
+        ax = self.fig.add_subplot(111)
+        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
+        # csvfile = '09_39_09_vehicle_air_data_0.csv'
+
+        # os.chdir(csvpath)
+        # df = pd.read_csv(csvfile)
+        # df = df[['timestamp', 'baro_temp_celcius']]
+
+        # ax.plot(df['timestamp'], df['baro_temp_celcius'])
+        # ax.set_xlabel("timestamp")
+
+        # self.fig.tight_layout()
+        # self.canvas.show()
+        # self.canvas.draw()   
 
 def PX4Forensic():
     suppress_qt_warnings()

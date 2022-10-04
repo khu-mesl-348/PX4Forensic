@@ -45,7 +45,7 @@ def hash_md5(filepath, blocksize=8192):
 def createdTime(filepath):
     return time.ctime(os.path.getmtime(filepath))
 
-def is_encrypted(safe, fence, mission, stats):
+def dataman_is_encrypted(safe, fence, mission, stats):
     if safe[0][0] != len(safe) - 1:
         return 1
 
