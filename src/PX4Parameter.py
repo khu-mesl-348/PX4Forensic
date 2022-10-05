@@ -1,3 +1,6 @@
+from Parameter.PX4ParameterParser import load_json, load_bson 
+import pandas
+import os
 '''
 구현할 기능
 
@@ -9,3 +12,25 @@
 6. 파라미터 파일 무결성 유지 (hash값)
 
 '''
+
+def get_paramaters():
+    print(os.getcwd())
+    data1 = load_json(os.getcwd()+"\\etc\\extras\\parameters.json.xz")
+    data2 = load_bson(os.getcwd()+"\\fs\\microsd\\parameters_backup.bson")
+    
+    #print(data1['version'],data1['parameters'])
+    #print(data2)
+    
+    res = []
+    for param in data1['parameters']:
+        for backup in data2:
+            if param['name'] == backup['name']:
+                param['value'] = backup['value']
+                break
+        res.append(param)
+    return res
+
+res = get_paramaters()
+for item in res:
+    if 'value' in item:
+        print(item)
