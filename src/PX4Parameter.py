@@ -1,4 +1,4 @@
-from Parameter.PX4ParameterParser import load_json, load_bson 
+from src.Parameter.PX4ParameterParser import load_json, load_bson 
 import pandas
 import os
 '''
@@ -13,7 +13,7 @@ import os
 
 '''
 
-def get_paramaters():
+def get_parameters():
     print(os.getcwd())
     data1 = load_json(os.getcwd()+"\\etc\\extras\\parameters.json.xz")
     data2 = load_bson(os.getcwd()+"\\fs\\microsd\\parameters_backup.bson")
@@ -30,7 +30,7 @@ def get_paramaters():
         res.append(param)
     return res
 
-res = get_paramaters()
+res = get_parameters()
 for item in res:
     if 'value' in item:
         print(item)
