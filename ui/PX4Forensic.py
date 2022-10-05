@@ -584,17 +584,6 @@ class Model(QStandardItemModel):
                 item.appendRow(child)
             self.setItem(i, 0, item)
 
-    def data(self, QModelIndex, role=None):
-        data = self.itemData(QModelIndex)
-        if role == Qt.DisplayRole:
-            ret = data[role]
-        elif role in data and role == Qt.DecorationRole:
-            ret = QPixmap(data[role]).scaledToHeight(25)
-        else:
-            ret = QVariant()
-        return ret
-
-#TODO: 09_39_09 삭제 -> 다른 방법으로 변환
 class LogForm(QWidget):
     def readCSV(self, filename):
             f = open(filename, 'r', encoding="utf-8")
@@ -609,6 +598,7 @@ class LogForm(QWidget):
 
             return result
 
+    #TODO: 09_39_09 삭제, 리스트에서 timstamp 삭제
     def __init__(self, tv):
         QWidget.__init__(self, flags = Qt.Widget)
 
@@ -617,7 +607,7 @@ class LogForm(QWidget):
         for i in range(len(self._log_list)):
             dic_data = {}
             _file_name = self._log_list[i]
-
+            
             if(_file_name.find('csv') != -1):
                 _tmp_file_name = _file_name.replace('.csv', '')
                 _tmp_file_name = _tmp_file_name.replace('09_39_09_', '')
@@ -627,11 +617,10 @@ class LogForm(QWidget):
                 log_data.append(dic_data)
 
         tv.setEditTriggers(QAbstractItemView.DoubleClicked)
-
         model = Model(log_data)
         tv.setModel(model)
 
-    def LogGraph(self, QModelIndex):
+    def LogGraph(self, csvpath, QModelIndex):
         data = self.model.itemData(QModelIndex)
 
         self.fig.clf()
