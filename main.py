@@ -3,9 +3,10 @@ from src.FTPReader import FTPReader
 from src.Mission.tools import SerialPort, command
 
 if __name__ == '__main__':
-    #p = SerialPort('COM5')
+    p = SerialPort('COM5')
 
-    #ftp = FTPReader(_port=p)
-    #ftp.live_shell()
+    ftp = FTPReader(_port=p)
+    ftp.live_shell()
 
-    PX4Forensic()
+    #PX4Forensic()
+    
