@@ -1,5 +1,14 @@
 from pymavlink import mavutil
-
+import binascii
+import hashlib
+import socket
+import traceback
+import serial
+import sys
+import random
+from crccheck.crc import Crcc16Mcrf4xx
+import time
+import curses
 
 class MavlinkPort:
     # 출처: PX4/Tools/mavlink.py
@@ -174,3 +183,38 @@ class MavlinkPort:
                     return -1
             else:
                 pass
+    
+    def calculate_length(self,payload):
+        return format(len(payload) // 2, '02x')
+
+
+    def packetGenerator(self, msgid, seq, id,pw):
+        global msgid_crc
+        info = id + ":" + pw
+        payload = info.encode()
+        payload = str(binascii.hexlify(payload), 'ascii')
+        stx = "fd"
+        incFLAG = "00"
+        cmpFLAG = "00"
+        compID = str(format(0, "02x"))
+        sysID = str(format(0, "02x"))
+        magic = format(int('20'), '02x')
+        msgid = format(int(msgid), '06x')
+        msgid = msgid[-2:] + msgid[-4:-2] + msgid[0:2]
+        length = self.calculate_length(payload)
+        seq = format(seq, '02x')
+        packet = length + incFLAG + cmpFLAG + seq + sysID + compID + msgid + payload
+        print(packet)
+        crc = Crcc16Mcrf4xx.calc(bytearray.fromhex(packet + magic))
+        crc = str(format(crc, '04x'))
+        crc = [crc[-2:], crc[0:2]]
+        packet += crc[0] + crc[1]
+        return stx + packet
+
+    def login_write(self, id, pw):
+
+        packet = self.packetGenerator('288',0,id, pw)
+
+        # write some bytes
+        self.debug("sending '%s' of len %u" % (packet,  len(packet)), 2)
+        self.mav.write(packet)
