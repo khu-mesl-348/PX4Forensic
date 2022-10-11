@@ -9,4 +9,3 @@ if __name__ == '__main__':
     #ftp.live_shell()
 
     PX4Forensic()
-    

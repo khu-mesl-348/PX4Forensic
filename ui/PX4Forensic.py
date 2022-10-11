@@ -15,6 +15,7 @@ from src.Logger.PX4LogParser import *
 import csv
 from PyQt5.QtGui import QStandardItemModel
 from PyQt5.QtGui import QStandardItem
+from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import QVariant
@@ -29,6 +30,7 @@ from haversine import inverse_haversine, Direction, Unit
 import pandas as pd
 from pandas import Series, DataFrame
 from ui.PX4ForensicParameter import Parameterclass
+
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
     environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
@@ -47,12 +49,18 @@ class WindowClass(QMainWindow, form_class) :
         self.setupUi(self)
 
         self.parameter_ui = Parameterclass(self.parameterList, self.parameterDescription, self.parameterValue, self.parameterRange, self.parameterInformation)
-
         self.progressbar = QProgressBar()
         self.statusbar.addPermanentWidget(self.progressbar)
         self.step = 0
         self.modulePath = ""
         self.tabWidget.currentChanged.connect(self.onChange)
+        self.clicked_log = ""
+        self.parent_log = ""
+
+        # 로고
+        self.initUI()
+        # 로그 리스트 객체 생성
+        self.LogTree()
 
         # port 연결
         serial_list = get_serial_item()
@@ -61,10 +69,8 @@ class WindowClass(QMainWindow, form_class) :
             for item in serial_list:
                 portAction = QAction(item[0])
                 portAction.triggered.connect(lambda: self.portClicked(item[0],item[1]))
-                self.menu_port2.addAction(portAction)
             disconnAction = QAction("연결 끊기")
             portAction.triggered.connect(lambda: self.portClicked("close",""))
-            self.menu_port2.addAction(disconnAction)
 
         if len(serial_list) != 0:
             self.mavPort = SerialPort(serial_list[0][0])
@@ -72,7 +78,6 @@ class WindowClass(QMainWindow, form_class) :
         else:
             self.mavPort = None
             self.label_connected.setText(f"unconnected")
-
 
         #self.ftp = FTPReader(_port=None)
         self.ftp = FTPReader(_port=self.mavPort)
@@ -99,57 +104,130 @@ class WindowClass(QMainWindow, form_class) :
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
 
-        # 그래프 객체 설정
         self.fig = plt.Figure(figsize=(1,1))
         self.canvas = FigureCanvas(self.fig)
-        self.graphLayout.addWidget(self.canvas)
 
-        self.tabWidget.setCurrentIndex(0)
+        self.log_fig = plt.Figure(figsize=(1,1))
+        self.log_canvas = FigureCanvas(self.log_fig)
+        
+    def initUI(self):
+        self.setWindowTitle('PX4ForensicTool')
+        self.setWindowIcon(QIcon('drone.png'))
+        self.setGeometry(300,300,300,200)
+        self.show()
+    
+    def returnClickedItem(self, tw):
+        return(tw.text())
 
+    def LogTree(self):
+        #파일 이름
+        self.log_treeWidget.setHeaderLabels(["ULog File"])
+        self.log_treeWidget.header().setVisible(True)
+        self.log_treeWidget.setAlternatingRowColors(True)
+
+        self.log_list = searchLogFile()
+        date_dirname = self.log_list[0].split("\\")[1]
+        date_dir = QTreeWidgetItem(self.log_treeWidget)
+        date_dir.setText(0, date_dirname)
+        ulgname = QTreeWidgetItem(date_dir)
+        ulgname.setText(0, self.log_list[0].split("\\")[2])
+
+        for i in range(len(self.log_list)):
+            ll = self.log_list[i]
+            tmp_date_dirname = ll.split("\\")[1]
+
+            if tmp_date_dirname != date_dirname:
+                date_dirname = tmp_date_dirname
+                date_dir = QTreeWidgetItem(self.log_treeWidget)
+                date_dir.setText(0, date_dirname)
+
+            if ll.find('csv')!= -1:
+                ulgname = ll.split("\\")[2]
+                set_ulgname = ulgname.replace('.csv','')
+                set_ulgname = set_ulgname[9:]
+                log_file = QTreeWidgetItem(date_dir)
+                log_file.setText(0, set_ulgname)
+
+                result = readCSV(ll)
+                result.remove('timestamp')
+
+                for j in range(len(result)):
+                    topic_list = QTreeWidgetItem(log_file)
+                    result[j]
+                    topic_list.setText(0, result[j])
+        
+        self.log_treeWidget.itemClicked.connect(self.getCurrentItems)
+        self.log_treeWidget.itemClicked.connect(self.LogItemClicked)
+        
+
+    def getCurrentItems(self):
+        if self.log_treeWidget.indexOfTopLevelItem(self.log_treeWidget.currentItem()) == -1:
+            self.parent_log = self.log_treeWidget.currentItem().parent().text(0)
+
+    def LogItemClicked(self, tl, col):
+        self.clicked_log = tl.text(col)
+        self.LogGraph()
+
+    def LogGraph(self):
+
+        #로그 그래프 객체 설정
+        self.logGraph.addWidget(self.log_canvas)
+
+        self.log_fig.clf()
+        ax = self.log_fig.add_subplot(111)
+
+        dirpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
+        csvfile = '09_39_09_'+ self.parent_log + '.csv'
+        logpath = dirpath + csvfile
+        
+        if os.path.isfile(logpath) == True:
+
+            os.chdir(dirpath)
+            df = pd.read_csv(csvfile)
+
+            df_timestamp = df['timestamp']
+            df_log = df[str(self.clicked_log)]
+            ax.plot(df_timestamp, df_log)
+            ax.set_xlabel("timestamp")
+
+            # ax.plot(df['timestamp'], df[self.clicked_log])
+            # ax.set_xlabel("timestamp")
+
+            self.log_fig.tight_layout()
+            self.log_canvas.show()
+            self.log_canvas.draw()
+        else:
+            print("해당 경로에 CSV 파일이 없습니다.")
+
+    #TODO: 로그 데이터 경로 수정
     def onChange(self):
         tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
+        #비행 데이터
         if tabIndex == 0:
             self.modulePath = "./fs/microsd/dataman"
             
+            self.tabWidget.setCurrentIndex(0)
+                        
+        #로그 데이터
         elif tabIndex == 1:
-            self.modulePath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"            
+            self.modulePath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
+
             #정보 출력
             self.fileInfo(self.modulePath, self.tableWidget_file_log)
             self.logParams(self.tableWidget_log_params, self.modulePath)
             self.logMessages(self.tableWidget_log_messages, self.modulePath)
 
-            #그래프 출력
-            self.logGraph.addWidget(self.canvas)
-            self.tempLogGraph()
-
-            #데이터 리스트 출력
-            #TODO: input 설정 및 함수로 만들기
-            #임시 로그 데이터 리스트 객체 설정
-            LogForm(self.treeView)
-            
+                        
+        #설정 데이터
         elif tabIndex == 2:
-            self.modulePath = "parameter"
             self.parameter_ui.show_parameter_list()
 
-    #TODO: 경로 수정
-    def tempLogGraph(self):
-        self.fig.clf()
-        ax = self.fig.add_subplot(111)
-        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
-        csvfile = '09_39_09_vehicle_air_data_0.csv'
-        os.chdir(csvpath)
-        df = pd.read_csv(csvfile)
-        df = df[['timestamp', 'baro_temp_celcius']]
-
-        ax.plot(df['timestamp'], df['baro_temp_celcius'])
-        ax.set_xlabel("timestamp")
-
-        self.fig.tight_layout()
-        self.canvas.show()
-        self.canvas.draw()    
-        
     def drawGraph(self, x, y, v, nav_cmd, title):
         print(x, y)
+
+        # 그래프 객체 설정
+        self.graphLayout.addWidget(self.canvas)
+
 
         self.fig.clf()
         ax = self.fig.add_subplot(111)
@@ -205,7 +283,6 @@ class WindowClass(QMainWindow, form_class) :
             x = way_x
             y = way_y
 
-
         print(x, y)
         x_blank = (max(x) - min(x)) / 10
         y_blank = (max(y) - min(y)) / 10
@@ -220,7 +297,9 @@ class WindowClass(QMainWindow, form_class) :
         self.fig.tight_layout()
         self.canvas.show()
         self.canvas.draw()
+
         return
+
 
     def getFileFromUAV(self):
         self.radio_safepoint.setDisabled(True)
@@ -375,7 +454,6 @@ class WindowClass(QMainWindow, form_class) :
         table.resizeColumnsToContents()
         os.close(fd)
 
-    #TODO: 파일 선택 창 구현 및 파라미터 filename 추가
     def logParams(self, table, filepath):
         _list = shell_log_params(filepath)
         table.setColumnCount(2)
@@ -580,73 +658,6 @@ class WindowClass(QMainWindow, form_class) :
             print(a)
             QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
-#로그 파일 리스트
-class Model(QStandardItemModel):
-    def __init__(self, log_data):
-        QStandardItemModel.__init__(self)
-
-        for i in range(len(log_data)):
-            d = log_data[i]
-            item = QStandardItem(d["type"])
-            for j in range(len(d["objects"])):
-                child = QStandardItem(d["objects"][j])
-                item.appendRow(child)
-            self.setItem(i, 0, item)
-
-class LogForm(QWidget):
-    def readCSV(self, filename):
-            f = open(filename, 'r', encoding="utf-8")
-            obj = csv.reader(f)
-            cnt = 0
-
-            for line in obj:
-                cnt = 1
-                result = line
-                if cnt == 1:
-                    break
-
-            return result
-
-    #TODO: 09_39_09 삭제, 리스트에서 timstamp 삭제
-    def __init__(self, tv):
-        QWidget.__init__(self, flags = Qt.Widget)
-
-        log_data = []
-        self._log_list = searchLogFile()
-        for i in range(len(self._log_list)):
-            dic_data = {}
-            _file_name = self._log_list[i]
-            
-            if(_file_name.find('csv') != -1):
-                _tmp_file_name = _file_name.replace('.csv', '')
-                _tmp_file_name = _tmp_file_name.replace('09_39_09_', '')
-                result = self.readCSV(_file_name)
-                dic_data["type"] = _tmp_file_name.split("\\")[2]
-                dic_data["objects"] = result
-                log_data.append(dic_data)
-
-        tv.setEditTriggers(QAbstractItemView.DoubleClicked)
-        model = Model(log_data)
-        tv.setModel(model)
-
-    def LogGraph(self, csvpath, QModelIndex):
-        data = self.model.itemData(QModelIndex)
-
-        self.fig.clf()
-        ax = self.fig.add_subplot(111)
-        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
-        # csvfile = '09_39_09_vehicle_air_data_0.csv'
-
-        # os.chdir(csvpath)
-        # df = pd.read_csv(csvfile)
-        # df = df[['timestamp', 'baro_temp_celcius']]
-
-        # ax.plot(df['timestamp'], df['baro_temp_celcius'])
-        # ax.set_xlabel("timestamp")
-
-        # self.fig.tight_layout()
-        # self.canvas.show()
-        # self.canvas.draw()   
 
 def PX4Forensic():
     suppress_qt_warnings()
