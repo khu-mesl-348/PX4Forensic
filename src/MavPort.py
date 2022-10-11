@@ -217,4 +217,4 @@ class MavlinkPort:
 
         # write some bytes
         self.debug("sending '%s' of len %u" % (packet,  len(packet)), 2)
-        self.mav.write(packet)
+        self.mav.write(bytes.fromhex(packet))
