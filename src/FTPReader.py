@@ -47,9 +47,6 @@ class FTPReader:
             self.connect_port(_port, blacklist)
 
 
-
-
-
     def connect_port(self, port, blacklist=[]):
         self.mav_port = port
         tree = Tree(self.mav_port)
@@ -71,7 +68,7 @@ class FTPReader:
                     sys.stdout.write(data)
                 if cur_line == "exit":
                     break
-
+        
         try:
 
             next_heartbeat_time = timer()
@@ -94,10 +91,10 @@ class FTPReader:
                                 break
                             self.mav_port.serial_write(cur_line + '\n')
                             cur_line = ''
-
+                            
                         else:
                             cur_line += ch
-
+                        
                     if cur_line == "exit":
                         break
                 if cur_line == "exit":
@@ -117,7 +114,6 @@ class FTPReader:
             self.mav_port.close()
 
         read_th.join()
-
 
     def get_crc_from_UAV(self, root="", blacklist=[]):
         st = []

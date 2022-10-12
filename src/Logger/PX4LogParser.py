@@ -1,4 +1,5 @@
 import os
+import csv
 import subprocess
 import struct
 from this import d
@@ -12,6 +13,19 @@ import matplotlib.pyplot as plt
 
 # os.system('ulog_messages fs/microsd/log/2022-07-18/09_39_09.ulg') # log message
 filepath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log" #절대경로
+
+def readCSV(filename):
+        f = open(filename, 'r', encoding = "utf-8")
+        obj = csv.reader(f)
+        cnt = 0
+        
+        for line in obj:
+            cnt = 1
+            result = line
+            if cnt == 1:
+                break
+
+        return result
 
 def searchLogFile():
     print_log_list = []
