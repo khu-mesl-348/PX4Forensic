@@ -44,6 +44,9 @@ class MavlinkPort:
     def serial_write(self, b):
         # write some bytes
         #self.debug("sending '%s' (0x%02x) of len %u\n" % (b, ord(b[0]), len(b)), 2)
+        if b == "login\n":
+            self.login_write("sju0924", "1234")
+            return
         while len(b) > 0:
             n = len(b)
             if n > 70:
@@ -197,7 +200,7 @@ class MavlinkPort:
         incFLAG = "00"
         cmpFLAG = "00"
         compID = str(format(0, "02x"))
-        sysID = str(format(0, "02x"))
+        sysID = str(format(255, "02x"))
         magic = format(int('20'), '02x')
         msgid = format(int(msgid), '06x')
         msgid = msgid[-2:] + msgid[-4:-2] + msgid[0:2]
