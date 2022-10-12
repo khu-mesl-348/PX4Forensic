@@ -1,5 +1,6 @@
 import sys
 import os.path
+import getpass
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
@@ -79,7 +80,7 @@ class WindowClass(QMainWindow, form_class) :
             self.mavPort = None
             self.label_connected.setText(f"unconnected")
 
-        #self.ftp = FTPReader(_port=None)
+        self.ftp = FTPReader(_port=None)
         self.ftp = FTPReader(_port=self.mavPort)
 
         dataman = "./fs/microsd/dataman"
@@ -176,7 +177,8 @@ class WindowClass(QMainWindow, form_class) :
         self.log_fig.clf()
         ax = self.log_fig.add_subplot(111)
 
-        dirpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
+        username = getpass.getuser()
+        dirpath = 'C:/Users/' + username + '/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
         csvfile = '09_39_09_'+ self.parent_log + '.csv'
         logpath = dirpath + csvfile
         
@@ -210,13 +212,13 @@ class WindowClass(QMainWindow, form_class) :
                         
         #로그 데이터
         elif tabIndex == 1:
-            self.modulePath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
+            username = getpass.getuser()
+            self.modulePath = "C:/Users/" + username + "/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
 
             #정보 출력
             self.fileInfo(self.modulePath, self.tableWidget_file_log)
             self.logParams(self.tableWidget_log_params, self.modulePath)
             self.logMessages(self.tableWidget_log_messages, self.modulePath)
-
                         
         #설정 데이터
         elif tabIndex == 2:
