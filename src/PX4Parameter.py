@@ -15,8 +15,8 @@ import os
 
 def get_parameters():
     print(os.getcwd())
-    data1 = load_json("C:\\Users\\youngbin\\Desktop\\PX4Forensic\\etc\\extras\\parameters.json.xz")
-    data2 = load_bson("C:\\Users\\youngbin\\Desktop\\PX4Forensic\\fs\\microsd\\parameters_backup.bson")
+    data1 = load_json("./etc/extras/parameters.json.xz")
+    data2 = load_bson("./fs/microsd/parameters_backup.bson")
     
     #print(data1['version'],data1['parameters'])
     #print(data2)

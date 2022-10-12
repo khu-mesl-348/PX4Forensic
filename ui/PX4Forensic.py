@@ -485,13 +485,6 @@ class WindowClass(QMainWindow, form_class) :
         table.resizeRowsToContents()
         table.resizeColumnsToContents()
 
-    def portCliked(self,port, des):
-        if self.mavPort == None or port == "close":
-            self.mavPort.close()
-
-        if port != "close":
-            self.mavPort = SerialPort(port)
-            self.label_connected.setText(f"connected: {des}({port})")
 
     def safeClicked(self):
         try:

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 # os.system('ulog_params fs/microsd/log/2022-07-18/09_39_09.ulg') #params
 
 # os.system('ulog_messages fs/microsd/log/2022-07-18/09_39_09.ulg') # log message
-filepath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log" #절대경로
+filepath = "./fs/microsd/log" #절대경로
 
 def readCSV(filename):
         f = open(filename, 'r', encoding = "utf-8")
