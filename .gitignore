@@ -10,5 +10,4 @@ obj/
 .idea/
 __pycache__/
 dataman*
-*.ulg
 *.csv

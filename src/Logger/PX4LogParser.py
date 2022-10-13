@@ -84,11 +84,11 @@ def shell_log_messages(filepath):
     return listData
 
 
-def shell_ulog_2_csv(filepath):
-    # os.system('ulog2csv fs/microsd/log/2022-07-18/09_39_09.ulg')
-    with open('output.txt', 'wb') as f:
-        out = subprocess.run(['ulog2csv', filepath], capture_output=True, text = True)
-        f.write(out.stdout)
+def shell_ulog_2_csv():
+    os.system('ulog2csv ./fs/microsd/log/2022-07-18/09_39_09.ulg')
+    # with open('output.txt', 'wb') as f:
+    #     out = subprocess.run(['ulog2csv', filepath], capture_output=True, text = True)
+    #     f.write(out.stdout)
 
 #ULog 파일 헤더
 class Header():

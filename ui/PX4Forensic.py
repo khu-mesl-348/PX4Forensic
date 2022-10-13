@@ -1,6 +1,7 @@
 import sys
 import os.path
 import getpass
+import glob
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
@@ -43,6 +44,15 @@ def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 �
 form_class = uic.loadUiType("ui/PX4Forensic.ui")[0]
 download_class = uic.loadUiType("ui/downloadProgress.ui")[0]
 
+#CSV 파일 존재 유무 확인
+username = getpass.getuser()
+dirpath = 'C:/Users/' + username + '/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
+fileExe = '*.csv'
+csvlist = glob.glob(dirpath+fileExe)
+if csvlist == []:
+    shell_ulog_2_csv()
+
+
 #화면을 띄우는데 사용되는 Class 선언
 class WindowClass(QMainWindow, form_class) :
     def __init__(self) :
@@ -60,6 +70,7 @@ class WindowClass(QMainWindow, form_class) :
 
         # 로고
         self.initUI()
+     
         # 로그 리스트 객체 생성
         self.LogTree()
 
@@ -111,6 +122,8 @@ class WindowClass(QMainWindow, form_class) :
         self.log_fig = plt.Figure(figsize=(1,1))
         self.log_canvas = FigureCanvas(self.log_fig)
         
+        self.tabWidget.setCurrentIndex(0)
+        
     def initUI(self):
         self.setWindowTitle('PX4ForensicTool')
         self.setWindowIcon(QIcon('drone.png'))
@@ -121,6 +134,7 @@ class WindowClass(QMainWindow, form_class) :
         return(tw.text())
 
     def LogTree(self):
+     
         #파일 이름
         self.log_treeWidget.setHeaderLabels(["ULog File"])
         self.log_treeWidget.header().setVisible(True)
@@ -183,9 +197,7 @@ class WindowClass(QMainWindow, form_class) :
         logpath = dirpath + csvfile
         
         if os.path.isfile(logpath) == True:
-
-            os.chdir(dirpath)
-            df = pd.read_csv(csvfile)
+            df = pd.read_csv(logpath)
 
             df_timestamp = df['timestamp']
             df_log = df[str(self.clicked_log)]
@@ -200,28 +212,30 @@ class WindowClass(QMainWindow, form_class) :
             self.log_canvas.draw()
         else:
             print("해당 경로에 CSV 파일이 없습니다.")
+            
 
     #TODO: 로그 데이터 경로 수정
     def onChange(self):
         tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
         #비행 데이터
-        if tabIndex == 0:
+
+        if tabIndex == 1:
+            print("Im dataman")
             self.modulePath = "./fs/microsd/dataman"
             
-            self.tabWidget.setCurrentIndex(0)
+            
                         
         #로그 데이터
-        elif tabIndex == 1:
+        elif tabIndex == 2:
             username = getpass.getuser()
             self.modulePath = "C:/Users/" + username + "/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
-
             #정보 출력
             self.fileInfo(self.modulePath, self.tableWidget_file_log)
             self.logParams(self.tableWidget_log_params, self.modulePath)
             self.logMessages(self.tableWidget_log_messages, self.modulePath)
                         
         #설정 데이터
-        elif tabIndex == 2:
+        elif tabIndex == 3:
             self.parameter_ui.show_parameter_list()
 
     def drawGraph(self, x, y, v, nav_cmd, title):

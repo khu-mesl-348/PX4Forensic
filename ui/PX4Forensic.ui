@@ -111,7 +111,7 @@
      </palette>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>2</number>
     </property>
     <widget class="QWidget" name="login">
      <attribute name="title">
@@ -482,18 +482,18 @@
      <widget class="QTableWidget" name="tableWidget_file_log">
       <property name="geometry">
        <rect>
-        <x>400</x>
-        <y>320</y>
-        <width>421</width>
-        <height>101</height>
+        <x>30</x>
+        <y>450</y>
+        <width>311</width>
+        <height>81</height>
        </rect>
       </property>
      </widget>
      <widget class="QLabel" name="label_7">
       <property name="geometry">
        <rect>
-        <x>400</x>
-        <y>290</y>
+        <x>30</x>
+        <y>420</y>
         <width>91</width>
         <height>31</height>
        </rect>
@@ -526,24 +526,14 @@
        </font>
       </property>
       <property name="text">
-       <string>[Data]</string>
-      </property>
-     </widget>
-     <widget class="QTableWidget" name="tableWidget_log_params">
-      <property name="geometry">
-       <rect>
-        <x>30</x>
-        <y>450</y>
-        <width>311</width>
-        <height>81</height>
-       </rect>
+       <string>[Figure]</string>
       </property>
      </widget>
      <widget class="QLabel" name="label_9">
       <property name="geometry">
        <rect>
-        <x>30</x>
-        <y>420</y>
+        <x>400</x>
+        <y>290</y>
         <width>91</width>
         <height>31</height>
        </rect>
@@ -614,6 +604,16 @@
         <string notr="true">1</string>
        </property>
       </column>
+     </widget>
+     <widget class="QTableWidget" name="tableWidget_log_params">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>320</y>
+        <width>301</width>
+        <height>101</height>
+       </rect>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="tab_3">
