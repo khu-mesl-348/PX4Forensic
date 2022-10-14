@@ -3,6 +3,26 @@
 [![All Contributors](https://img.shields.io/badge/all_contributors-5-orange.svg?style=flat-square)](#contributors)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
+# Requirment
+## 1. install path: 'C:\Users\username\Desktop'
+## 2. install 'PyULog', the ULog file Open Source Parser
+```
+pip install pyulog
+```
+
+## 3. install 'windows-curses'
+```
+pip install windows-curses
+```
+## 4. install 'pandas'
+```
+pip install pandas
+```
+## 5. install 'matplotlib'
+```
+pip install matplotlib
+```
+
 
 ## Contributors ✨
 
