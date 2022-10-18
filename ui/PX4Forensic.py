@@ -2,12 +2,14 @@ import sys
 import os.path
 import getpass
 import glob
+from datetime import time
+
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
 from src.Mission.PyMavlinkCRC32 import crc
 from src.Mission.PX4MissionParser import missionParser
-from src.Mission.tools import SerialPort
+from src.Mission.tools import SerialPort, command
 
 #TODO: mission, logger 파일 검증 함수 분리
 from src.PX4Mission import hash_sha1, hash_md5, createdTime, dataman_is_encrypted #mission
@@ -67,7 +69,6 @@ class WindowClass(QMainWindow, form_class) :
         self.tabWidget.currentChanged.connect(self.onChange)
         self.clicked_log = ""
         self.parent_log = ""
-
         # 로고
         self.initUI()
      
@@ -91,7 +92,7 @@ class WindowClass(QMainWindow, form_class) :
             self.mavPort = None
             self.label_connected.setText(f"unconnected")
 
-        self.ftp = FTPReader(_port=None)
+        self.login = self.loginCheck()
         self.ftp = FTPReader(_port=self.mavPort)
 
         dataman = "./fs/microsd/dataman"
@@ -115,6 +116,7 @@ class WindowClass(QMainWindow, form_class) :
         self.radio_waypoint.toggled.connect(self.wayClicked)
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
+        self.loginButton.clicked.connect(self.loginClicked)
 
         self.fig = plt.Figure(figsize=(1,1))
         self.canvas = FigureCanvas(self.fig)
@@ -173,7 +175,51 @@ class WindowClass(QMainWindow, form_class) :
         
         self.log_treeWidget.itemClicked.connect(self.getCurrentItems)
         self.log_treeWidget.itemClicked.connect(self.LogItemClicked)
-        
+
+    def loginCheck(self):
+        res = command("integrity_tools login\n", self.mavPort)
+        print(res.split("\n")[1])
+        if res.split("\n")[1] == "true":
+            self.ID.setText("")
+            self.PW.setText("")
+            self.ID.setDisabled(True)
+            self.PW.setDisabled(True)
+            self.loginButton.setText("logout")
+            return True
+        else:
+            return False
+
+    def loginClicked(self):
+        if not self.login:
+            _id = self.ID.text()
+            _pw = self.PW.text()
+
+            print("integrity_tools login " + _id+" " + _pw)
+
+            res = command("integrity_tools login " + _id+" " + _pw+"\n", self.mavPort)
+            self.loginLabel.setText(res.split("\n")[1])
+            print(res)
+
+            if self.loginCheck():
+                self.login = True
+                self.ID.setText("")
+                self.PW.setText("")
+                self.ID.setDisabled(True)
+                self.PW.setDisabled(True)
+                self.loginButton.setText("logout")
+
+        else:
+            res = command("integrity_tools login 0 0" + "\n", self.mavPort)
+            print(res)
+            self.loginLabel.setText("login")
+            res = command("integrity_tools login\n", self.mavPort)
+            print(res)
+            self.ID.setEnabled(True)
+            self.PW.setEnabled(True)
+            self.loginLabel.setText("")
+            self.loginButton.setText("login")
+            self.login = False
+
 
     def getCurrentItems(self):
         if self.log_treeWidget.indexOfTopLevelItem(self.log_treeWidget.currentItem()) == -1:
