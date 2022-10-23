@@ -60,7 +60,7 @@ def shell_log_info():
 def shell_log_params(filepath):
     _listData = []
     cmd = ['ulog_params', filepath]
-    fd_popen = subprocess.Popen(cmd, stdout= subprocess.PIPE).stdout
+    fd_popen = subprocess.Popen(cmd, stdout= subprocess.PIPE, shell=True).stdout
     data = fd_popen.read().strip()
     stringData = byte_to_string(data)
     listData = stringData.split('\r\n')
