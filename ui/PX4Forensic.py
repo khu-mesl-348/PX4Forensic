@@ -2,8 +2,7 @@ import sys
 import os.path
 import getpass
 import glob
-from datetime import time
-
+import hashlib
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
@@ -69,21 +68,10 @@ class WindowClass(QMainWindow, form_class) :
         self.tabWidget.currentChanged.connect(self.onChange)
         self.clicked_log = ""
         self.parent_log = ""
-        # 로고
-        self.initUI()
-     
-        # 로그 리스트 객체 생성
-        self.LogTree()
+        self.mavPort = None
+        self.label_connected.setText(f"unconnected")
 
-        # port 연결
         serial_list = get_serial_item()
-
-        if len(serial_list) != 0:
-            for item in serial_list:
-                portAction = QAction(item[0])
-                portAction.triggered.connect(lambda: self.portClicked(item[0],item[1]))
-            disconnAction = QAction("연결 끊기")
-            portAction.triggered.connect(lambda: self.portClicked("close",""))
 
         if len(serial_list) != 0:
             self.mavPort = SerialPort(serial_list[0][0])
@@ -94,6 +82,12 @@ class WindowClass(QMainWindow, form_class) :
 
         self.login = self.loginCheck()
         self.ftp = FTPReader(_port=self.mavPort)
+        # 로고
+        self.initUI()
+     
+        # 로그 리스트 객체 생성
+        self.LogTree()
+
 
         dataman = "./fs/microsd/dataman"
 
@@ -134,6 +128,20 @@ class WindowClass(QMainWindow, form_class) :
     
     def returnClickedItem(self, tw):
         return(tw.text())
+
+    def connectSerial(self):
+        # port 연결
+        serial_list = get_serial_item()
+
+        if len(serial_list) != 0:
+            self.mavPort = SerialPort(serial_list[0][0])
+            self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
+        else:
+            self.mavPort = None
+            self.label_connected.setText(f"unconnected")
+
+        self.login = self.loginCheck()
+        self.ftp = FTPReader(_port=self.mavPort)
 
     def LogTree(self):
      
@@ -188,6 +196,29 @@ class WindowClass(QMainWindow, form_class) :
             return True
         else:
             return False
+
+    def HMAC_calc(self, filename):
+
+        command("cd /\n", self.mavPort)
+        s = command("cat " + filename.strip(".") + "h\n", self.mavPort).split("\n")[1]
+        print("received raw: ", s)
+        s = s[40:68]
+
+        res = 0
+        a = [ord(i) for i in s]
+        for i in a:
+            res = (res << 8) + i
+        hmac_rec = str(hex(res))[2:]
+        print("received hmac file: ", hmac_rec)
+
+        h = hashlib.sha3_224()
+        plain = open(filename, 'rb').read()
+        plain = plain + b"mesl:1234"
+        h.update(plain)
+        hmac_cur = h.hexdigest()
+        print("hmac of current file: ", hmac_cur)
+
+        return hmac_rec == hmac_cur
 
     def loginClicked(self):
         if not self.login:
@@ -447,7 +478,7 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.showMessage("")
         self.statusbar.repaint()
         self.progressbar.setValue(0)
-        dataman = "../fs/microsd/dataman"
+        dataman = "./fs/microsd/dataman"
 
         try:
             parser_fd = os.open(dataman, os.O_BINARY)
@@ -484,8 +515,10 @@ class WindowClass(QMainWindow, form_class) :
             datamanId = self.parser.get_mission()[3]
             encrypt = dataman_is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
                                self.parser.get_mission_item(datamanId), self.parser.get_mission())
+            inte = self.HMAC_calc(filename)
         if "ulg" in filename:
             encrypt = is_encrypted(filename)
+            inte = True
 
         created = createdTime(filename)
         hashSha = hash_sha1(filename)
@@ -499,8 +532,8 @@ class WindowClass(QMainWindow, form_class) :
         elif encrypt ==1 :
             encrypt = "True"
 
-        header = ["created", "MD5", "SHA-1", "encrypted","CRC"]
-        data = [created, hashSha,hashMD5,encrypt,CrcResult ]
+        header = ["created", "MD5", "SHA-1","CRC", "integrity"]
+        data = [created, hashSha,hashMD5,CrcResult,inte]
 
         table.setColumnCount(2)
         table.setRowCount(len(header))

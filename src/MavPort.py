@@ -1,15 +1,6 @@
 from pymavlink import mavutil
 import binascii
-import hashlib
-import socket
-import traceback
-import serial
-import sys
-import random
 from crccheck.crc import Crcc16Mcrf4xx
-import time
-import curses
-
 class MavlinkPort:
     # 출처: PX4/Tools/mavlink.py
     '''an object that looks like a serial port, but
