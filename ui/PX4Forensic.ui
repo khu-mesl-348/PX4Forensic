@@ -224,8 +224,18 @@
         <height>31</height>
        </rect>
       </property>
+      <property name="font">
+       <font>
+        <family>맑은 고딕</family>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
       <property name="text">
        <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
       </property>
      </widget>
     </widget>

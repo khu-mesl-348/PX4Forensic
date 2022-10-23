@@ -198,7 +198,7 @@ class WindowClass(QMainWindow, form_class) :
             return False
 
     def HMAC_calc(self, filename):
-
+        command("integrity_tools verify "+filename.strip(".") + "\n", self.mavPort)
         command("cd /\n", self.mavPort)
         s = command("cat " + filename.strip(".") + "h\n", self.mavPort).split("\n")[1]
         print("received raw: ", s)
