@@ -227,6 +227,7 @@
       <property name="font">
        <font>
         <family>맑은 고딕</family>
+        <pointsize>10</pointsize>
         <weight>75</weight>
         <bold>true</bold>
        </font>
