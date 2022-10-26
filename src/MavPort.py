@@ -36,7 +36,7 @@ class MavlinkPort:
         # write some bytes
         #self.debug("sending '%s' (0x%02x) of len %u\n" % (b, ord(b[0]), len(b)), 2)
         if b == "login\n":
-            self.login_write("sju0924", "1234")
+            self.login_write("mesl", "1234")
             return
         while len(b) > 0:
             n = len(b)

@@ -70,18 +70,10 @@ class WindowClass(QMainWindow, form_class) :
         self.parent_log = ""
         self.mavPort = None
         self.label_connected.setText(f"unconnected")
+        self.login = None
+        self.ftp = None
 
-        serial_list = get_serial_item()
-
-        if len(serial_list) != 0:
-            self.mavPort = SerialPort(serial_list[0][0])
-            self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
-        else:
-            self.mavPort = None
-            self.label_connected.setText(f"unconnected")
-
-        self.login = self.loginCheck()
-        self.ftp = FTPReader(_port=self.mavPort)
+        self.connectSerial()
         # 로고
         self.initUI()
      
@@ -89,20 +81,20 @@ class WindowClass(QMainWindow, form_class) :
         self.LogTree()
 
 
-        dataman = "./fs/microsd/dataman"
+        self.dataman = "./fs/microsd/dataman"
 
         try:
-            parser_fd = os.open(dataman, os.O_BINARY)
+            parser_fd = os.open(self.dataman, os.O_BINARY)
             self.parser = missionParser(parser_fd)
             # 파일 정보 표시(mission)
-            self.fileInfo(dataman,self.tableWidget_file)
+            self.fileInfo(self.dataman, self.tableWidget_file)
         except FileNotFoundError as e:
             self.parser = None
-            print(e)
+            QMessageBox.about(self, '파일 오류', '파일이 존재하지 않습니다.')
             pass
         except AttributeError as a:
             print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못됨.')
+            QMessageBox.about(self, '연결 오류', 'PX4와 연결되어 있지 않습니다.')
 
         # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
@@ -134,6 +126,8 @@ class WindowClass(QMainWindow, form_class) :
         serial_list = get_serial_item()
 
         if len(serial_list) != 0:
+            if serial_list[0][0].find("통신 포트") < 0:
+                return -1
             self.mavPort = SerialPort(serial_list[0][0])
             self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
         else:
@@ -142,6 +136,8 @@ class WindowClass(QMainWindow, form_class) :
 
         self.login = self.loginCheck()
         self.ftp = FTPReader(_port=self.mavPort)
+
+        return 1
 
     def LogTree(self):
      
@@ -198,7 +194,6 @@ class WindowClass(QMainWindow, form_class) :
             return False
 
     def HMAC_calc(self, filename):
-        command("integrity_tools hmac " + filename.strip(".") + "\n", self.mavPort)
         command("cd /\n", self.mavPort)
         s = command("cat " + filename.strip(".") + "h\n", self.mavPort).split("\n")[1]
         print("received raw: ", s)
@@ -297,12 +292,11 @@ class WindowClass(QMainWindow, form_class) :
         #비행 데이터
 
         if tabIndex == 1:
-            print("Im dataman")
             self.modulePath = "./fs/microsd/dataman"
             
-            
-                        
+
         #로그 데이터
+
         elif tabIndex == 2:
             username = getpass.getuser()
             self.modulePath = "C:/Users/" + username + "/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
@@ -395,6 +389,12 @@ class WindowClass(QMainWindow, form_class) :
 
 
     def getFileFromUAV(self):
+
+        if self.ftp is None:
+            res = self.connectSerial()
+            if res == -1:
+                QMessageBox.about(self, '연결 오류', 'PX4와 연결되어 있지 않습니다.')
+                return -1
         self.radio_safepoint.setDisabled(True)
         self.radio_geofencepoint.setDisabled(True)
         self.radio_waypoint.setDisabled(True)
@@ -478,14 +478,13 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.showMessage("")
         self.statusbar.repaint()
         self.progressbar.setValue(0)
-        dataman = "./fs/microsd/dataman"
 
         try:
-            parser_fd = os.open(dataman, os.O_BINARY)
+            parser_fd = os.open(self.modulePath, os.O_BINARY)
             self.parser = missionParser(parser_fd)
 
             # 파일 정보 표시(mission)
-            self.fileInfo(dataman, self.tableWidget_file)
+            self.fileInfo(self.modulePath, self.tableWidget_file)
 
         except FileNotFoundError as e:
             print(os.getcwd())
@@ -506,16 +505,21 @@ class WindowClass(QMainWindow, form_class) :
             return
         fd = os.open(filename, os.O_BINARY)
         if fd < 0:
-            self.getFileFromUAV()
-            fd = os.open(filename, os.O_BINARY)
-            if fd < 0:
+            if self.ftp is not None:
+                self.getFileFromUAV()
+                fd = os.open(filename, os.O_BINARY)
+            elif fd < 0 or self.ftp is None:
                 return -1
 
         if "dataman" in filename :
             datamanId = self.parser.get_mission()[3]
             encrypt = dataman_is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
                                self.parser.get_mission_item(datamanId), self.parser.get_mission())
-            inte = self.HMAC_calc(filename)
+            if self.ftp is not None:
+                inte = self.HMAC_calc(filename)
+            else:
+                inte = "unconnected"
+
         if "ulg" in filename:
             encrypt = is_encrypted(filename)
             inte = True
@@ -523,10 +527,15 @@ class WindowClass(QMainWindow, form_class) :
         created = createdTime(filename)
         hashSha = hash_sha1(filename)
         hashMD5 = hash_md5(filename)
-        
-        ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
-        Crc = crc()
-        CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
+
+        if self.ftp is not None:
+            ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
+            Crc = crc()
+            CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
+        else:
+            CrcResult = "unconnected"
+
+
         if encrypt == 0:
             encrypt = "False"
         elif encrypt ==1 :
@@ -623,6 +632,7 @@ class WindowClass(QMainWindow, form_class) :
             self.tableWidget_point.resizeRowsToContents()
             print(x, y)
             self.drawGraph(x, y, [],[],title='safe points')
+            self.fileInfo(self.modulePath, self.tableWidget_file)
 
         except FileNotFoundError as e:
             print(e)
@@ -630,7 +640,10 @@ class WindowClass(QMainWindow, form_class) :
             pass
         except AttributeError as a:
             print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+            if a == "'NoneType' object has no attribute 'serial_write'":
+                pass
+            else:
+                QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
 
     def geoClicked(self):
@@ -682,13 +695,18 @@ class WindowClass(QMainWindow, form_class) :
 
             self.tableWidget_point.resizeRowsToContents()
             self.drawGraph(x, y, v, n, "fence points")
+
+            self.fileInfo(self.modulePath, self.tableWidget_file)
         except FileNotFoundError as e:
             print(e)
             QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
             pass
         except AttributeError as a:
             print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+            if a == "'NoneType' object has no attribute 'serial_write'":
+                pass
+            else:
+                QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
     def wayClicked(self):
         try:
@@ -738,13 +756,17 @@ class WindowClass(QMainWindow, form_class) :
                 v.append(int(item[13]))
             self.tableWidget_point.resizeRowsToContents()
             self.drawGraph(x, y, v, n, "waypoints")
+
+            self.fileInfo(self.modulePath, self.tableWidget_file)
         except FileNotFoundError as e:
             print(e)
             QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
             pass
         except AttributeError as a:
-            print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+            if a == "'NoneType' object has no attribute 'serial_write'":
+                pass
+            else:
+                QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
 
 def PX4Forensic():
