@@ -299,7 +299,7 @@ class WindowClass(QMainWindow, form_class) :
 
         elif tabIndex == 2:
             username = getpass.getuser()
-            self.modulePath = "C:/Users/" + username + "/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
+            self.modulePath = "C:/Users/" + username  + "/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
             #정보 출력
             self.fileInfo(self.modulePath, self.tableWidget_file_log)
             self.logParams(self.tableWidget_log_params, self.modulePath)

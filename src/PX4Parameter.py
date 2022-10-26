@@ -30,5 +30,5 @@ def get_parameters():
         res.append(param)
     return res
 
-res = get_parameters()
+#res = get_parameters()
 
