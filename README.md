@@ -3,7 +3,7 @@
 [![All Contributors](https://img.shields.io/badge/all_contributors-5-orange.svg?style=flat-square)](#contributors)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
-# Introduce 📖
+# Introduction 📖
 > ###PX4 Autopilot 내부 데이터를 분석하고 무결성 검증을 제공하는 응용 프로그램입니다.
 * 무결성 검증 기능은 khu-mesl-348/PX4-Autopilot 펌웨어와 호환됩니다.
 * 일부 기능은 PX4와 USB Serial 연결이 필요합니다.
