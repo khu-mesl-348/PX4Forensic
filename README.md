@@ -53,6 +53,8 @@ pip install windows-curses
 
 
 ## 3. Execution
+### 모듈 적용
+
 ```
 python main.py
 ```
