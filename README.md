@@ -54,7 +54,10 @@ pip install windows-curses
 
 ## 3. Execution
 ### 모듈 적용
+1. `/module/integrity_tools` 를 PX4 소스의  `/src/modules` 하위에 이동
+2. `/module/default.px4board`를 `/board/px4/fmu-v5` 하위에 이동
 
+### 분석 도구 실행
 ```
 python main.py
 ```
