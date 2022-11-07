@@ -79,12 +79,14 @@ python main.py
 
 ## 3. 로그 데이터 분석
 로그 데이터에 대한 정보를 보여줍니다.
+* ULog files
 * File info
 * Message
 * Parameters
 
 ## 4. 설정 데이터 분석
 파라미터에 대한 정보를 보여줍니다.
+* Parameters
 * Value
 * Range
 * Description
