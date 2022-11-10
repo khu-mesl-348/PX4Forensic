@@ -35,6 +35,9 @@ import pandas as pd
 from pandas import Series, DataFrame
 from ui.PX4ForensicParameter import Parameterclass
 
+# Use if it have to set port manually
+# Serial = '/dev/ttyS0'
+
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
     environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
@@ -74,7 +77,7 @@ class WindowClass(QMainWindow, form_class) :
         self.login = None
         self.ftp = None
 
-        self.connectSerial()
+        self.connectSerial(serial=Serial)
         # 로고
         self.initUI()
      
@@ -122,18 +125,22 @@ class WindowClass(QMainWindow, form_class) :
     def returnClickedItem(self, tw):
         return(tw.text())
 
-    def connectSerial(self):
-        # port 연결
-        serial_list = get_serial_item()
-
-        if len(serial_list) != 0:
-            if serial_list[0][0].find("통신 포트") < 0:
-                return -1
-            self.mavPort = SerialPort(serial_list[0][0])
-            self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
+    def connectSerial(self, serial = None):
+        if serial is not None:
+            self.mavPort = SerialPort(serial)
+            self.label_connected.setText(f"connected: {serial}")
         else:
-            self.mavPort = None
-            self.label_connected.setText(f"unconnected")
+            # port 연결
+            serial_list = get_serial_item()
+
+            if len(serial_list) != 0:
+                if serial_list[0][0].find("통신 포트") < 0:
+                    return -1
+                self.mavPort = SerialPort(serial_list[0][0])
+                self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
+            else:
+                self.mavPort = None
+                self.label_connected.setText(f"unconnected")
 
         self.login = self.loginCheck()
         self.ftp = FTPReader(_port=self.mavPort)
