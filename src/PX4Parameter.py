@@ -15,8 +15,8 @@ import os
 
 def get_parameters():
     print(os.getcwd())
-    data1 = load_json(os.getcwd()+"\\etc\\extras\\parameters.json.xz")
-    data2 = load_bson(os.getcwd()+"\\fs\\microsd\\parameters_backup.bson")
+    data1 = load_json("./etc/extras/parameters.json.xz")
+    data2 = load_bson("./fs/microsd/parameters_backup.bson")
     
     #print(data1['version'],data1['parameters'])
     #print(data2)
@@ -30,7 +30,5 @@ def get_parameters():
         res.append(param)
     return res
 
-res = get_parameters()
-for item in res:
-    if 'value' in item:
-        print(item)
+#res = get_parameters()
+

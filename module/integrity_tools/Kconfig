@@ -1,0 +1,10 @@
+menuconfig MODULES_INTEGRITY_TOOLS
+	bool "integrity_tools"
+	default n
+	---help---
+		Enable support for integrity_tools
+
+
+	menuconfig HMAC_KEY
+	string "hmac key"
+	depends on MODULES_INTEGRITY_TOOLS

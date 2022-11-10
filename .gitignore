@@ -4,10 +4,15 @@ package-lock.json
 bin/
 dev/
 etc/
-fs/
+fs/*
+!fs/micorsd/
+!fs/microsd/log
+!fs/microsd/2022-07-18
+!fs/microsd/2022-07-18/*ulg
+
 proc/
 obj/
 .idea/
 __pycache__/
 dataman*
-*.ulg
+*.csv

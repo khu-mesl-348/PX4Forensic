@@ -39,6 +39,7 @@ def SerialPort(port='auto',_b='57600'):
                 if data.find('nsh>') != -1:
                     break
         print('PX4 connect complete')
+        
     except KeyboardInterrupt:
         print('Aborting')
         return

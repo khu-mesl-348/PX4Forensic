@@ -1,7 +1,10 @@
 import struct
 
-from src.MavPort import MavlinkPort 
+from src.MavPort import MavlinkPort
+from src.Mission.tools import command
 from pymavlink import mavutil
+import hashlib
+import binascii
 
 def main():
     serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',

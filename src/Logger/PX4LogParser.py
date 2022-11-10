@@ -1,4 +1,5 @@
 import os
+import csv
 import subprocess
 import struct
 from this import d
@@ -11,7 +12,20 @@ import matplotlib.pyplot as plt
 # os.system('ulog_params fs/microsd/log/2022-07-18/09_39_09.ulg') #params
 
 # os.system('ulog_messages fs/microsd/log/2022-07-18/09_39_09.ulg') # log message
-filepath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log" #절대경로
+filepath = "./fs/microsd/log" #절대경로
+
+def readCSV(filename):
+        f = open(filename, 'r', encoding = "utf-8")
+        obj = csv.reader(f)
+        cnt = 0
+        
+        for line in obj:
+            cnt = 1
+            result = line
+            if cnt == 1:
+                break
+
+        return result
 
 def searchLogFile():
     print_log_list = []
@@ -46,7 +60,7 @@ def shell_log_info():
 def shell_log_params(filepath):
     _listData = []
     cmd = ['ulog_params', filepath]
-    fd_popen = subprocess.Popen(cmd, stdout= subprocess.PIPE).stdout
+    fd_popen = subprocess.Popen(cmd, stdout= subprocess.PIPE, shell=True).stdout
     data = fd_popen.read().strip()
     stringData = byte_to_string(data)
     listData = stringData.split('\r\n')
@@ -70,11 +84,11 @@ def shell_log_messages(filepath):
     return listData
 
 
-def shell_ulog_2_csv(filepath):
-    # os.system('ulog2csv fs/microsd/log/2022-07-18/09_39_09.ulg')
-    with open('output.txt', 'wb') as f:
-        out = subprocess.run(['ulog2csv', filepath], capture_output=True, text = True)
-        f.write(out.stdout)
+def shell_ulog_2_csv():
+    os.system('ulog2csv ./fs/microsd/log/2022-07-18/09_39_09.ulg')
+    # with open('output.txt', 'wb') as f:
+    #     out = subprocess.run(['ulog2csv', filepath], capture_output=True, text = True)
+    #     f.write(out.stdout)
 
 #ULog 파일 헤더
 class Header():

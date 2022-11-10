@@ -1,11 +1,15 @@
 import sys
 import os.path
+import getpass
+import glob
+import hashlib
+import platform
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
 from src.Mission.PyMavlinkCRC32 import crc
 from src.Mission.PX4MissionParser import missionParser
-from src.Mission.tools import SerialPort
+from src.Mission.tools import SerialPort, command
 
 #TODO: mission, logger 파일 검증 함수 분리
 from src.PX4Mission import hash_sha1, hash_md5, createdTime, dataman_is_encrypted #mission
@@ -15,6 +19,7 @@ from src.Logger.PX4LogParser import *
 import csv
 from PyQt5.QtGui import QStandardItemModel
 from PyQt5.QtGui import QStandardItem
+from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import QVariant
@@ -29,6 +34,7 @@ from haversine import inverse_haversine, Direction, Unit
 import pandas as pd
 from pandas import Series, DataFrame
 from ui.PX4ForensicParameter import Parameterclass
+
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
     environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
@@ -40,6 +46,15 @@ def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 �
 form_class = uic.loadUiType("ui/PX4Forensic.ui")[0]
 download_class = uic.loadUiType("ui/downloadProgress.ui")[0]
 
+#CSV 파일 존재 유무 확인
+username = getpass.getuser()
+dirpath = 'C:/Users/' + username + '/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
+fileExe = '*.csv'
+csvlist = glob.glob(dirpath+fileExe)
+if csvlist == []:
+    shell_ulog_2_csv()
+
+
 #화면을 띄우는데 사용되는 Class 선언
 class WindowClass(QMainWindow, form_class) :
     def __init__(self) :
@@ -47,50 +62,40 @@ class WindowClass(QMainWindow, form_class) :
         self.setupUi(self)
 
         self.parameter_ui = Parameterclass(self.parameterList, self.parameterDescription, self.parameterValue, self.parameterRange, self.parameterInformation)
-
         self.progressbar = QProgressBar()
         self.statusbar.addPermanentWidget(self.progressbar)
         self.step = 0
         self.modulePath = ""
         self.tabWidget.currentChanged.connect(self.onChange)
+        self.clicked_log = ""
+        self.parent_log = ""
+        self.mavPort = None
+        self.label_connected.setText(f"unconnected")
+        self.login = None
+        self.ftp = None
 
-        # port 연결
-        serial_list = get_serial_item()
-
-        if len(serial_list) != 0:
-            for item in serial_list:
-                portAction = QAction(item[0])
-                portAction.triggered.connect(lambda: self.portClicked(item[0],item[1]))
-                self.menu_port2.addAction(portAction)
-            disconnAction = QAction("연결 끊기")
-            portAction.triggered.connect(lambda: self.portClicked("close",""))
-            self.menu_port2.addAction(disconnAction)
-
-        if len(serial_list) != 0:
-            self.mavPort = SerialPort(serial_list[0][0])
-            self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
-        else:
-            self.mavPort = None
-            self.label_connected.setText(f"unconnected")
+        self.connectSerial()
+        # 로고
+        self.initUI()
+     
+        # 로그 리스트 객체 생성
+        self.LogTree()
 
 
-        #self.ftp = FTPReader(_port=None)
-        self.ftp = FTPReader(_port=self.mavPort)
-
-        dataman = "./fs/microsd/dataman"
+        self.dataman = "./fs/microsd/dataman"
 
         try:
-            parser_fd = os.open(dataman, os.O_BINARY)
+            parser_fd = os.open(self.dataman, os.O_BINARY)
             self.parser = missionParser(parser_fd)
             # 파일 정보 표시(mission)
-            self.fileInfo(dataman,self.tableWidget_file)
+            self.fileInfo(self.dataman, self.tableWidget_file)
         except FileNotFoundError as e:
             self.parser = None
-            print(e)
+            QMessageBox.about(self, '파일 오류', '파일이 존재하지 않습니다.')
             pass
         except AttributeError as a:
             print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못됨.')
+            QMessageBox.about(self, '연결 오류', 'PX4와 연결되어 있지 않습니다.')
 
         # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
@@ -98,59 +103,226 @@ class WindowClass(QMainWindow, form_class) :
         self.radio_waypoint.toggled.connect(self.wayClicked)
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
+        self.loginButton.clicked.connect(self.loginClicked)
 
-        # 그래프 객체 설정
         self.fig = plt.Figure(figsize=(1,1))
         self.canvas = FigureCanvas(self.fig)
-        self.graphLayout.addWidget(self.canvas)
 
+        self.log_fig = plt.Figure(figsize=(1,1))
+        self.log_canvas = FigureCanvas(self.log_fig)
+        
         self.tabWidget.setCurrentIndex(0)
+        
+    def initUI(self):
+        self.setWindowTitle('PX4ForensicTool')
+        self.setWindowIcon(QIcon('drone.png'))
+        self.setGeometry(300,300,300,200)
+        self.show()
+    
+    def returnClickedItem(self, tw):
+        return(tw.text())
 
+    def connectSerial(self):
+        # port 연결
+        serial_list = get_serial_item()
+
+        if len(serial_list) != 0:
+            if serial_list[0][0].find("통신 포트") < 0:
+                return -1
+            self.mavPort = SerialPort(serial_list[0][0])
+            self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
+        else:
+            self.mavPort = None
+            self.label_connected.setText(f"unconnected")
+
+        self.login = self.loginCheck()
+        self.ftp = FTPReader(_port=self.mavPort)
+
+        return 1
+
+    def LogTree(self):
+     
+        #파일 이름
+        self.log_treeWidget.setHeaderLabels(["ULog File"])
+        self.log_treeWidget.header().setVisible(True)
+        self.log_treeWidget.setAlternatingRowColors(True)
+
+        pathsym = ""
+        if platform.system() == "Linux":
+            pathsym = "/"
+        elif platform.system()  == "Windows":
+            pathsym = "\\"
+
+
+        self.log_list = searchLogFile()
+        print(type(platform.system()))
+        date_dirname = self.log_list[0].split(pathsym)[1]
+        date_dir = QTreeWidgetItem(self.log_treeWidget)
+        date_dir.setText(0, date_dirname)
+        ulgname = QTreeWidgetItem(date_dir)
+        ulgname.setText(0, self.log_list[0].split(pathsym)[2])
+
+        for i in range(len(self.log_list)):
+            ll = self.log_list[i]
+            tmp_date_dirname = ll.split(pathsym)[1]
+
+            if tmp_date_dirname != date_dirname:
+                date_dirname = tmp_date_dirname
+                date_dir = QTreeWidgetItem(self.log_treeWidget)
+                date_dir.setText(0, date_dirname)
+
+            if ll.find('csv')!= -1:
+                ulgname = ll.split(pathsym)[2]
+                set_ulgname = ulgname.replace('.csv','')
+                set_ulgname = set_ulgname[9:]
+                log_file = QTreeWidgetItem(date_dir)
+                log_file.setText(0, set_ulgname)
+
+                result = readCSV(ll)
+                result.remove('timestamp')
+
+                for j in range(len(result)):
+                    topic_list = QTreeWidgetItem(log_file)
+                    result[j]
+                    topic_list.setText(0, result[j])
+        
+        self.log_treeWidget.itemClicked.connect(self.getCurrentItems)
+        self.log_treeWidget.itemClicked.connect(self.LogItemClicked)
+
+    def loginCheck(self):
+        res = command("integrity_tools login\n", self.mavPort)
+        print(res.split("\n")[1])
+        if res.split("\n")[1] == "true":
+            self.ID.setText("")
+            self.PW.setText("")
+            self.ID.setDisabled(True)
+            self.PW.setDisabled(True)
+            self.loginButton.setText("logout")
+            return True
+        else:
+            return False
+
+    def HMAC_calc(self, filename):
+        command("cd /\n", self.mavPort)
+        s = command("cat " + filename.strip(".") + "h\n", self.mavPort).split("\n")[1]
+        print("received raw: ", s)
+        s = s[40:68]
+
+        res = 0
+        a = [ord(i) for i in s]
+        for i in a:
+            res = (res << 8) + i
+        hmac_rec = str(hex(res))[2:]
+        print("received hmac file: ", hmac_rec)
+
+        h = hashlib.sha3_224()
+        plain = open(filename, 'rb').read()
+        plain = plain + b"mesl:1234"
+        h.update(plain)
+        hmac_cur = h.hexdigest()
+        print("hmac of current file: ", hmac_cur)
+
+        return hmac_rec == hmac_cur
+
+    def loginClicked(self):
+        if not self.login:
+            _id = self.ID.text()
+            _pw = self.PW.text()
+
+            print("integrity_tools login " + _id+" " + _pw)
+
+            res = command("integrity_tools login " + _id+" " + _pw+"\n", self.mavPort)
+            self.loginLabel.setText(res.split("\n")[1])
+            print(res)
+
+            if self.loginCheck():
+                self.login = True
+                self.ID.setText("")
+                self.PW.setText("")
+                self.ID.setDisabled(True)
+                self.PW.setDisabled(True)
+                self.loginButton.setText("logout")
+
+        else:
+            res = command("integrity_tools login 0 0" + "\n", self.mavPort)
+            print(res)
+            self.loginLabel.setText("login")
+            res = command("integrity_tools login\n", self.mavPort)
+            print(res)
+            self.ID.setEnabled(True)
+            self.PW.setEnabled(True)
+            self.loginLabel.setText("")
+            self.loginButton.setText("login")
+            self.login = False
+
+
+    def getCurrentItems(self):
+        if self.log_treeWidget.indexOfTopLevelItem(self.log_treeWidget.currentItem()) == -1:
+            self.parent_log = self.log_treeWidget.currentItem().parent().text(0)
+
+    def LogItemClicked(self, tl, col):
+        self.clicked_log = tl.text(col)
+        self.LogGraph()
+
+    def LogGraph(self):
+
+        #로그 그래프 객체 설정
+        self.logGraph.addWidget(self.log_canvas)
+
+        self.log_fig.clf()
+        ax = self.log_fig.add_subplot(111)
+
+        username = getpass.getuser()
+        dirpath = 'C:/Users/' + username + '/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
+        csvfile = '09_39_09_'+ self.parent_log + '.csv'
+        logpath = dirpath + csvfile
+        
+        if os.path.isfile(logpath) == True:
+            df = pd.read_csv(logpath)
+
+            df_timestamp = df['timestamp']
+            df_log = df[str(self.clicked_log)]
+            ax.plot(df_timestamp, df_log)
+            ax.set_xlabel("timestamp")
+
+            # ax.plot(df['timestamp'], df[self.clicked_log])
+            # ax.set_xlabel("timestamp")
+
+            self.log_fig.tight_layout()
+            self.log_canvas.show()
+            self.log_canvas.draw()
+        else:
+            print("해당 경로에 CSV 파일이 없습니다.")
+            
+
+    #TODO: 로그 데이터 경로 수정
     def onChange(self):
         tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
-        if tabIndex == 0:
+        #비행 데이터
+
+        if tabIndex == 1:
             self.modulePath = "./fs/microsd/dataman"
             
-        elif tabIndex == 1:
-            self.modulePath = "C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"            
+
+        #로그 데이터
+
+        elif tabIndex == 2:
+            username = getpass.getuser()
+            self.modulePath = "C:/Users/" + username  + "/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
             #정보 출력
             self.fileInfo(self.modulePath, self.tableWidget_file_log)
             self.logParams(self.tableWidget_log_params, self.modulePath)
             self.logMessages(self.tableWidget_log_messages, self.modulePath)
-
-            #그래프 출력
-            self.logGraph.addWidget(self.canvas)
-            self.tempLogGraph()
-
-            #데이터 리스트 출력
-            #TODO: input 설정 및 함수로 만들기
-            #임시 로그 데이터 리스트 객체 설정
-            LogForm(self.treeView)
-            
-        elif tabIndex == 2:
-            self.modulePath = "parameter"
+                        
+        #설정 데이터
+        elif tabIndex == 3:
             self.parameter_ui.show_parameter_list()
 
-    #TODO: 경로 수정
-    def tempLogGraph(self):
-        self.fig.clf()
-        ax = self.fig.add_subplot(111)
-        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
-        csvfile = '09_39_09_vehicle_air_data_0.csv'
-        os.chdir(csvpath)
-        df = pd.read_csv(csvfile)
-        df = df[['timestamp', 'baro_temp_celcius']]
-
-        ax.plot(df['timestamp'], df['baro_temp_celcius'])
-        ax.set_xlabel("timestamp")
-
-        self.fig.tight_layout()
-        self.canvas.show()
-        self.canvas.draw()    
-        
     def drawGraph(self, x, y, v, nav_cmd, title):
         print(x, y)
 
+        # 그래프 객체 설정
+        self.graphLayout.addWidget(self.canvas)
         self.fig.clf()
         ax = self.fig.add_subplot(111)
         ax.set_title(title)
@@ -205,7 +377,6 @@ class WindowClass(QMainWindow, form_class) :
             x = way_x
             y = way_y
 
-
         print(x, y)
         x_blank = (max(x) - min(x)) / 10
         y_blank = (max(y) - min(y)) / 10
@@ -220,9 +391,17 @@ class WindowClass(QMainWindow, form_class) :
         self.fig.tight_layout()
         self.canvas.show()
         self.canvas.draw()
+
         return
 
+
     def getFileFromUAV(self):
+
+        if self.ftp is None:
+            res = self.connectSerial()
+            if res == -1:
+                QMessageBox.about(self, '연결 오류', 'PX4와 연결되어 있지 않습니다.')
+                return -1
         self.radio_safepoint.setDisabled(True)
         self.radio_geofencepoint.setDisabled(True)
         self.radio_waypoint.setDisabled(True)
@@ -306,14 +485,13 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.showMessage("")
         self.statusbar.repaint()
         self.progressbar.setValue(0)
-        dataman = "../fs/microsd/dataman"
 
         try:
-            parser_fd = os.open(dataman, os.O_BINARY)
+            parser_fd = os.open(self.modulePath, os.O_BINARY)
             self.parser = missionParser(parser_fd)
 
             # 파일 정보 표시(mission)
-            self.fileInfo(dataman, self.tableWidget_file)
+            self.fileInfo(self.modulePath, self.tableWidget_file)
 
         except FileNotFoundError as e:
             print(os.getcwd())
@@ -334,32 +512,44 @@ class WindowClass(QMainWindow, form_class) :
             return
         fd = os.open(filename, os.O_BINARY)
         if fd < 0:
-            self.getFileFromUAV()
-            fd = os.open(filename, os.O_BINARY)
-            if fd < 0:
+            if self.ftp is not None:
+                self.getFileFromUAV()
+                fd = os.open(filename, os.O_BINARY)
+            elif fd < 0 or self.ftp is None:
                 return -1
 
         if "dataman" in filename :
             datamanId = self.parser.get_mission()[3]
             encrypt = dataman_is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
                                self.parser.get_mission_item(datamanId), self.parser.get_mission())
+            if self.ftp is not None:
+                inte = self.HMAC_calc(filename)
+            else:
+                inte = "unconnected"
+
         if "ulg" in filename:
             encrypt = is_encrypted(filename)
+            inte = True
 
         created = createdTime(filename)
         hashSha = hash_sha1(filename)
         hashMD5 = hash_md5(filename)
-        
-        ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
-        Crc = crc()
-        CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
+
+        if self.ftp is not None:
+            ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
+            Crc = crc()
+            CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
+        else:
+            CrcResult = "unconnected"
+
+
         if encrypt == 0:
             encrypt = "False"
         elif encrypt ==1 :
             encrypt = "True"
 
-        header = ["created", "MD5", "SHA-1", "encrypted","CRC"]
-        data = [created, hashSha,hashMD5,encrypt,CrcResult ]
+        header = ["created", "MD5", "SHA-1","CRC", "integrity"]
+        data = [created, hashSha,hashMD5,CrcResult,inte]
 
         table.setColumnCount(2)
         table.setRowCount(len(header))
@@ -375,7 +565,6 @@ class WindowClass(QMainWindow, form_class) :
         table.resizeColumnsToContents()
         os.close(fd)
 
-    #TODO: 파일 선택 창 구현 및 파라미터 filename 추가
     def logParams(self, table, filepath):
         _list = shell_log_params(filepath)
         table.setColumnCount(2)
@@ -405,13 +594,6 @@ class WindowClass(QMainWindow, form_class) :
         table.resizeRowsToContents()
         table.resizeColumnsToContents()
 
-    def portCliked(self,port, des):
-        if self.mavPort == None or port == "close":
-            self.mavPort.close()
-
-        if port != "close":
-            self.mavPort = SerialPort(port)
-            self.label_connected.setText(f"connected: {des}({port})")
 
     def safeClicked(self):
         try:
@@ -457,6 +639,7 @@ class WindowClass(QMainWindow, form_class) :
             self.tableWidget_point.resizeRowsToContents()
             print(x, y)
             self.drawGraph(x, y, [],[],title='safe points')
+            self.fileInfo(self.modulePath, self.tableWidget_file)
 
         except FileNotFoundError as e:
             print(e)
@@ -464,7 +647,10 @@ class WindowClass(QMainWindow, form_class) :
             pass
         except AttributeError as a:
             print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+            if a == "'NoneType' object has no attribute 'serial_write'":
+                pass
+            else:
+                QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
 
     def geoClicked(self):
@@ -516,13 +702,18 @@ class WindowClass(QMainWindow, form_class) :
 
             self.tableWidget_point.resizeRowsToContents()
             self.drawGraph(x, y, v, n, "fence points")
+
+            self.fileInfo(self.modulePath, self.tableWidget_file)
         except FileNotFoundError as e:
             print(e)
             QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
             pass
         except AttributeError as a:
             print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+            if a == "'NoneType' object has no attribute 'serial_write'":
+                pass
+            else:
+                QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
     def wayClicked(self):
         try:
@@ -572,81 +763,18 @@ class WindowClass(QMainWindow, form_class) :
                 v.append(int(item[13]))
             self.tableWidget_point.resizeRowsToContents()
             self.drawGraph(x, y, v, n, "waypoints")
+
+            self.fileInfo(self.modulePath, self.tableWidget_file)
         except FileNotFoundError as e:
             print(e)
             QMessageBox.about(self, '파일 오류', '비행 데이터 파일을 찾을 수 없습니다.')
             pass
         except AttributeError as a:
-            print(a)
-            QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
+            if a == "'NoneType' object has no attribute 'serial_write'":
+                pass
+            else:
+                QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
 
-#로그 파일 리스트
-class Model(QStandardItemModel):
-    def __init__(self, log_data):
-        QStandardItemModel.__init__(self)
-
-        for i in range(len(log_data)):
-            d = log_data[i]
-            item = QStandardItem(d["type"])
-            for j in range(len(d["objects"])):
-                child = QStandardItem(d["objects"][j])
-                item.appendRow(child)
-            self.setItem(i, 0, item)
-
-class LogForm(QWidget):
-    def readCSV(self, filename):
-            f = open(filename, 'r', encoding="utf-8")
-            obj = csv.reader(f)
-            cnt = 0
-
-            for line in obj:
-                cnt = 1
-                result = line
-                if cnt == 1:
-                    break
-
-            return result
-
-    #TODO: 09_39_09 삭제, 리스트에서 timstamp 삭제
-    def __init__(self, tv):
-        QWidget.__init__(self, flags = Qt.Widget)
-
-        log_data = []
-        self._log_list = searchLogFile()
-        for i in range(len(self._log_list)):
-            dic_data = {}
-            _file_name = self._log_list[i]
-            
-            if(_file_name.find('csv') != -1):
-                _tmp_file_name = _file_name.replace('.csv', '')
-                _tmp_file_name = _tmp_file_name.replace('09_39_09_', '')
-                result = self.readCSV(_file_name)
-                dic_data["type"] = _tmp_file_name.split("\\")[2]
-                dic_data["objects"] = result
-                log_data.append(dic_data)
-
-        tv.setEditTriggers(QAbstractItemView.DoubleClicked)
-        model = Model(log_data)
-        tv.setModel(model)
-
-    def LogGraph(self, csvpath, QModelIndex):
-        data = self.model.itemData(QModelIndex)
-
-        self.fig.clf()
-        ax = self.fig.add_subplot(111)
-        csvpath = 'C:/Users/youngbin/Desktop/PX4Forensic/fs/microsd/log/2022-07-18'
-        # csvfile = '09_39_09_vehicle_air_data_0.csv'
-
-        # os.chdir(csvpath)
-        # df = pd.read_csv(csvfile)
-        # df = df[['timestamp', 'baro_temp_celcius']]
-
-        # ax.plot(df['timestamp'], df['baro_temp_celcius'])
-        # ax.set_xlabel("timestamp")
-
-        # self.fig.tight_layout()
-        # self.canvas.show()
-        # self.canvas.draw()   
 
 def PX4Forensic():
     suppress_qt_warnings()

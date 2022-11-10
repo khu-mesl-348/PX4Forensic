@@ -39,15 +39,12 @@ class Parameterclass:
 
     def clickon(self):
         curItem = self.list.currentItem().text()
-        print(curItem)
+        
         for item in self.param:
 
             if item['name'] == curItem:
-                print(item)
                 # Description 테이블 채우기
                 i = 0
-
-
 
                 if 'shortDesc' in item:
                     self.description.setItem(i, 0, QTableWidgetItem('short'))
@@ -57,7 +54,6 @@ class Parameterclass:
                     self.description.setItem(i, 0, QTableWidgetItem('long'))
                     self.description.setItem(i, 1, QTableWidgetItem(item['longDesc']))
 
-                print(type(self.description))
                 # Value 값 채우기
                 if 'value' in item:
                     self.value.setText(str(item['value']))

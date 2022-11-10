@@ -3,10 +3,13 @@ from src.FTPReader import FTPReader
 from src.Mission.tools import SerialPort, command
 
 if __name__ == '__main__':
-    p = SerialPort('COM5')
+    # shell command에 직접 접속할때 주석을 푸세요
+    #p = SerialPort()
+    #ftp = FTPReader(_port=p)
+    #ftp.live_shell()
 
-    ftp = FTPReader(_port=p)
-    ftp.live_shell()
-
-    #PX4Forensic()
+    # 프로그램 실행
+    PX4Forensic()
+    
+    
     
