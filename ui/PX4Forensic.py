@@ -3,6 +3,7 @@ import os.path
 import getpass
 import glob
 import hashlib
+import platform
 from PyQt5.QtWidgets import *
 from src.mavlink_shell import get_serial_item
 from src.FTPReader import FTPReader
@@ -146,16 +147,24 @@ class WindowClass(QMainWindow, form_class) :
         self.log_treeWidget.header().setVisible(True)
         self.log_treeWidget.setAlternatingRowColors(True)
 
+        pathsym = ""
+        if platform.system() == "Linux":
+            pathsym = "/"
+        elif platform.system()  == "Windows":
+            pathsym = "\\"
+
+
         self.log_list = searchLogFile()
-        date_dirname = self.log_list[0].split("\\")[1]
+        print(type(platform.system()))
+        date_dirname = self.log_list[0].split(pathsym)[1]
         date_dir = QTreeWidgetItem(self.log_treeWidget)
         date_dir.setText(0, date_dirname)
         ulgname = QTreeWidgetItem(date_dir)
-        ulgname.setText(0, self.log_list[0].split("\\")[2])
+        ulgname.setText(0, self.log_list[0].split(pathsym)[2])
 
         for i in range(len(self.log_list)):
             ll = self.log_list[i]
-            tmp_date_dirname = ll.split("\\")[1]
+            tmp_date_dirname = ll.split(pathsym)[1]
 
             if tmp_date_dirname != date_dirname:
                 date_dirname = tmp_date_dirname
@@ -163,7 +172,7 @@ class WindowClass(QMainWindow, form_class) :
                 date_dir.setText(0, date_dirname)
 
             if ll.find('csv')!= -1:
-                ulgname = ll.split("\\")[2]
+                ulgname = ll.split(pathsym)[2]
                 set_ulgname = ulgname.replace('.csv','')
                 set_ulgname = set_ulgname[9:]
                 log_file = QTreeWidgetItem(date_dir)
@@ -314,8 +323,6 @@ class WindowClass(QMainWindow, form_class) :
 
         # 그래프 객체 설정
         self.graphLayout.addWidget(self.canvas)
-
-
         self.fig.clf()
         ax = self.fig.add_subplot(111)
         ax.set_title(title)
