@@ -6,7 +6,7 @@ from src.MavPort import MavlinkPort
 # @input: -
 # @output: MavlinkSerialPort
 # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
-def SerialPort(port='auto'):
+def SerialPort(port='auto',_b='57600'):
 
     if port == 'auto':
         # 시리얼 포트 자동 detect
@@ -31,7 +31,7 @@ def SerialPort(port='auto'):
 
     print("Connecting to MAVLINK...")
     try:
-        mav_serialport = MavlinkPort(port, baudrate=115200, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
+        mav_serialport = MavlinkPort(port, baudrate=_b, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
         mav_serialport.serial_write('\n')  # make sure the shell is started
         while True:
             data = mav_serialport.serial_read(4096)

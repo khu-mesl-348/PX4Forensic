@@ -25,8 +25,7 @@ def main():
 
     print("Connecting to MAVLINK...")
 
-    m = MavlinkPort(port, baudrate=115200, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
+    m = MavlinkPort(port, baudrate=57600, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
     m.login_write("sju0924","1234")
-
 if __name__ == '__main__':
     main()
