@@ -36,7 +36,7 @@ from pandas import Series, DataFrame
 from ui.PX4ForensicParameter import Parameterclass
 
 # Use if it have to set port manually
-# Serial = '/dev/ttyS0'
+Serial = None
 
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
@@ -129,12 +129,12 @@ class WindowClass(QMainWindow, form_class) :
         if serial is not None:
             self.mavPort = SerialPort(serial)
             self.label_connected.setText(f"connected: {serial}")
-        else:
+        elif serial is None:
             # port 연결
             serial_list = get_serial_item()
 
             if len(serial_list) != 0:
-                if serial_list[0][0].find("통신 포트") < 0:
+                if serial_list[0][0].find("통신 포트") > 0:
                     return -1
                 self.mavPort = SerialPort(serial_list[0][0])
                 self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
