@@ -50,7 +50,8 @@ pip install -r requirements.txt
 ```
 pip install windows-curses
 ```
-
+* Linux 환경에서 사용 시
+> /ui/PX4Forensic.py 파일에서 Serial={PX4가 연결된 시리얼 포트명} 으로 설정해준다. 
 
 ## 3. Execution
 ### 모듈 적용
