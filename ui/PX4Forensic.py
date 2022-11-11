@@ -36,11 +36,8 @@ from pandas import Series, DataFrame
 from ui.PX4ForensicParameter import Parameterclass
 
 # Use if it have to set port manually
-<<<<<<< HEAD
 # if you use linux os, check your serial port that connected with px4
-# basic path '/dev/ttyACM0'
-=======
->>>>>>> 158d06270ccadfa19d36e05deafaf0d3ba091af2
+# example: Serial = '/dev/ttyACM0'
 Serial = None
 
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
