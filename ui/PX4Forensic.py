@@ -36,7 +36,9 @@ from pandas import Series, DataFrame
 from ui.PX4ForensicParameter import Parameterclass
 
 # Use if it have to set port manually
-# Serial = '/dev/ttyS0'
+# if you use linux os, check your serial port that connected with px4
+# basic path '/dev/ttyACM0'
+Serial = None
 
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
@@ -93,12 +95,14 @@ class WindowClass(QMainWindow, form_class) :
             # 파일 정보 표시(mission)
             self.fileInfo(self.dataman, self.tableWidget_file)
         except FileNotFoundError as e:
-            self.parser = None
-            QMessageBox.about(self, '파일 오류', '파일이 존재하지 않습니다.')
+            self.getFileFromUAV()
+            parser_fd = os.open(self.dataman, os.O_BINARY)
+            self.parser = missionParser(parser_fd)
             pass
         except AttributeError as a:
-            print(a)
-            QMessageBox.about(self, '연결 오류', 'PX4와 연결되어 있지 않습니다.')
+            print(a)            
+            parser_fd = os.open(self.dataman,0)
+            self.parser = missionParser(parser_fd)
 
         # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
@@ -505,6 +509,12 @@ class WindowClass(QMainWindow, form_class) :
             self.parser = None
             print(e)
             pass
+        except AttributeError as a:
+            print(a)            
+            parser_fd = os.open(self.dataman,0)
+            self.parser = missionParser(parser_fd)
+            self.fileInfo(self.modulePath, self.tableWidget_file)
+            pass
 
         QApplication.processEvents()
         self.dataRefreshButton.setEnabled(True)
@@ -517,11 +527,18 @@ class WindowClass(QMainWindow, form_class) :
             fd = os.open(filename, os.O_BINARY)
         except FileNotFoundError:
             return
-        fd = os.open(filename, os.O_BINARY)
+        except AttributeError as a:
+            print(a)            
+            fd = os.open(filename,0)
+            
         if fd < 0:
             if self.ftp is not None:
                 self.getFileFromUAV()
-                fd = os.open(filename, os.O_BINARY)
+                try:
+                    fd = os.open(filename, os.O_BINARY)
+                except AttributeError as a:
+                    print(a)            
+                    fd = os.open(filename,0)
             elif fd < 0 or self.ftp is None:
                 return -1
 
@@ -655,6 +672,8 @@ class WindowClass(QMainWindow, form_class) :
         except AttributeError as a:
             print(a)
             if a == "'NoneType' object has no attribute 'serial_write'":
+                pass
+            elif a =="module 'os' has no attribute 'O_BINARY'":
                 pass
             else:
                 QMessageBox.about(self, '파일 오류', '파일이 잘못되었습니다.')
