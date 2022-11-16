@@ -59,6 +59,7 @@ pip install windows-curses
 ### 모듈 적용
 1. `/module/integrity_tools` 를 PX4 소스의  `/src/modules` 하위에 이동
 2. `/module/default.px4board`를 `/board/px4/fmu-v5` 하위에 이동
+3. HMAC 생성하고자 하는 코드 위치에 API 적용
 
 ### 분석 도구 실행
 ```
