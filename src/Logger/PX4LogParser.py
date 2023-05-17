@@ -28,13 +28,17 @@ def readCSV(filename):
         return result
 
 def searchLogFile():
-    print_log_list = []
+    print_log_list = {}
     for dir in os.listdir(filepath):
         d = os.path.join(filepath, dir)
+        print_log_list[d] = {}
         if os.path.isdir(d):
             for file in os.listdir(d):
                 f = os.path.join(d, file)
-                print_log_list.append(f)
+                if file.find('.ulg') != -1:
+                    print_log_list[d][file] = []
+                elif file.find('csv') != -1:
+                    print_log_list[d][file[:8]+'.ulg'].append(file)
                 
     return(print_log_list)
 
@@ -84,11 +88,11 @@ def shell_log_messages(filepath):
     return listData
 
 
-def shell_ulog_2_csv():
-    os.system('ulog2csv ./fs/microsd/log/2022-07-18/09_39_09.ulg')
-    # with open('output.txt', 'wb') as f:
-    #     out = subprocess.run(['ulog2csv', filepath], capture_output=True, text = True)
-    #     f.write(out.stdout)
+def shell_ulog_2_csv(path):
+    os.system('ulog2csv ' + path)
+    with open('output.txt', 'wb') as f:
+        out = subprocess.run(['ulog2csv', filepath], capture_output=True, text = True)
+        f.write(out.stdout.encode('utf-8'))
 
 #ULog 파일 헤더
 class Header():

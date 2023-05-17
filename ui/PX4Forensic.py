@@ -38,6 +38,13 @@ from ui.PX4ForensicParameter import Parameterclass
 # Use if it have to set port manually
 Serial = None
 
+pathsym = ""
+
+if platform.system() == "Linux":
+    pathsym = "/"
+elif platform.system()  == "Windows":
+    pathsym = "\\"
+            
 def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 함수
     environ["QT_DEVICE_PIXEL_RATIO"] = "0"
     environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
@@ -74,7 +81,6 @@ class WindowClass(QMainWindow, form_class) :
         self.parent_log = ""
         self.mavPort = None
         self.label_connected.setText(f"unconnected")
-        self.login = None
         self.ftp = None
 
         self.connectSerial(serial=Serial)
@@ -106,7 +112,6 @@ class WindowClass(QMainWindow, form_class) :
         self.radio_waypoint.toggled.connect(self.wayClicked)
 
         self.dataRefreshButton.clicked.connect(self.getFileFromUAV)
-        self.loginButton.clicked.connect(self.loginClicked)
 
         self.fig = plt.Figure(figsize=(1,1))
         self.canvas = FigureCanvas(self.fig)
@@ -142,10 +147,10 @@ class WindowClass(QMainWindow, form_class) :
                 self.mavPort = None
                 self.label_connected.setText(f"unconnected")
 
-        self.login = self.loginCheck()
         self.ftp = FTPReader(_port=self.mavPort)
 
         return 1
+
 
     def LogTree(self):
      
@@ -154,60 +159,37 @@ class WindowClass(QMainWindow, form_class) :
         self.log_treeWidget.header().setVisible(True)
         self.log_treeWidget.setAlternatingRowColors(True)
 
-        pathsym = ""
-        if platform.system() == "Linux":
-            pathsym = "/"
-        elif platform.system()  == "Windows":
-            pathsym = "\\"
-
-
-        self.log_list = searchLogFile()
-        print(type(platform.system()))
-        date_dirname = self.log_list[0].split(pathsym)[1]
-        date_dir = QTreeWidgetItem(self.log_treeWidget)
-        date_dir.setText(0, date_dirname)
-        ulgname = QTreeWidgetItem(date_dir)
-        ulgname.setText(0, self.log_list[0].split(pathsym)[2])
-
-        for i in range(len(self.log_list)):
-            ll = self.log_list[i]
-            tmp_date_dirname = ll.split(pathsym)[1]
-
-            if tmp_date_dirname != date_dirname:
-                date_dirname = tmp_date_dirname
-                date_dir = QTreeWidgetItem(self.log_treeWidget)
-                date_dir.setText(0, date_dirname)
-
-            if ll.find('csv')!= -1:
-                ulgname = ll.split(pathsym)[2]
-                set_ulgname = ulgname.replace('.csv','')
-                set_ulgname = set_ulgname[9:]
-                log_file = QTreeWidgetItem(date_dir)
-                log_file.setText(0, set_ulgname)
-
-                result = readCSV(ll)
-                result.remove('timestamp')
-
-                for j in range(len(result)):
-                    topic_list = QTreeWidgetItem(log_file)
-                    result[j]
-                    topic_list.setText(0, result[j])
         
-        self.log_treeWidget.itemClicked.connect(self.getCurrentItems)
-        self.log_treeWidget.itemClicked.connect(self.LogItemClicked)
+        self.statusbar.showMessage('loading files...')
+        self.statusbar.repaint()
+        
+        self.log_treeWidget.clear()
+        self.log_list = searchLogFile()
+        print(self.log_list)
+        print(type(platform.system()))
+        
+        for item in self.log_list:
+            print(item)
+            date_dirname = item.split(pathsym)[-1]
+            date_dir = QTreeWidgetItem(self.log_treeWidget)
+            date_dir.setText(0, date_dirname)
+            
+            for time in self.log_list[item]:
+                ulgname = QTreeWidgetItem(date_dir)
+                ulgname.setText(0, time)
+                
+                for logs in self.log_list[item][time]:
+                    logname = QTreeWidgetItem(ulgname)
+                    logname.setText(0, logs[9:])
+            
 
-    def loginCheck(self):
-        res = command("integrity_tools login\n", self.mavPort)
-        print(res.split("\n")[1])
-        if res.split("\n")[1] == "true":
-            self.ID.setText("")
-            self.PW.setText("")
-            self.ID.setDisabled(True)
-            self.PW.setDisabled(True)
-            self.loginButton.setText("logout")
-            return True
-        else:
-            return False
+    
+                    
+        self.log_treeWidget.itemClicked.connect(self.LogItemClicked)
+        self.statusbar.showMessage('')
+        self.statusbar.repaint()
+
+ 
 
     def HMAC_calc(self, filename):
         command("cd /\n", self.mavPort)
@@ -231,37 +213,6 @@ class WindowClass(QMainWindow, form_class) :
 
         return hmac_rec == hmac_cur
 
-    def loginClicked(self):
-        if not self.login:
-            _id = self.ID.text()
-            _pw = self.PW.text()
-
-            print("integrity_tools login " + _id+" " + _pw)
-
-            res = command("integrity_tools login " + _id+" " + _pw+"\n", self.mavPort)
-            self.loginLabel.setText(res.split("\n")[1])
-            print(res)
-
-            if self.loginCheck():
-                self.login = True
-                self.ID.setText("")
-                self.PW.setText("")
-                self.ID.setDisabled(True)
-                self.PW.setDisabled(True)
-                self.loginButton.setText("logout")
-
-        else:
-            res = command("integrity_tools login 0 0" + "\n", self.mavPort)
-            print(res)
-            self.loginLabel.setText("login")
-            res = command("integrity_tools login\n", self.mavPort)
-            print(res)
-            self.ID.setEnabled(True)
-            self.PW.setEnabled(True)
-            self.loginLabel.setText("")
-            self.loginButton.setText("login")
-            self.login = False
-
 
     def getCurrentItems(self):
         if self.log_treeWidget.indexOfTopLevelItem(self.log_treeWidget.currentItem()) == -1:
@@ -275,20 +226,60 @@ class WindowClass(QMainWindow, form_class) :
 
         #로그 그래프 객체 설정
         self.logGraph.addWidget(self.log_canvas)
-
         self.log_fig.clf()
         ax = self.log_fig.add_subplot(111)
-
-        username = getpass.getuser()
-        dirpath = 'C:/Users/' + username + '/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
-        csvfile = '09_39_09_'+ self.parent_log + '.csv'
-        logpath = dirpath + csvfile
         
-        if os.path.isfile(logpath) == True:
-            df = pd.read_csv(logpath)
-
+        
+        curItem = self.log_treeWidget.currentItem()
+        
+        
+        if curItem.text(0).find('.ulg') != -1:
+            print("curitem:", curItem.text(0))
+            self.log_treeWidget.currentItem().setExpanded(True)
+            
+            logpath = self.modulePath + pathsym +  curItem.parent().text(0) + pathsym + curItem.text(0)
+            
+            print(logpath)
+                
+            if not curItem.childCount():
+                
+                self.statusbar.showMessage('making csv...')
+                self.statusbar.repaint()
+                
+                shell_ulog_2_csv(logpath)
+                for file in os.listdir(self.modulePath + pathsym +  curItem.parent().text(0)):
+                    if curItem.text(0)[:-4] in file and '.csv' in file:
+                        csvItem = QTreeWidgetItem(curItem)
+                        csvItem.setText(0, file[9:])
+                
+                self.statusbar.showMessage('')
+                self.statusbar.repaint()
+            
+            #정보 출력
+            self.fileInfo(logpath, self.tableWidget_file_log)            
+            self.logParams(self.tableWidget_log_params, logpath)
+            self.logMessages(self.tableWidget_log_messages, logpath)                       
+                
+            
+        elif curItem.text(0).find('.csv') != -1:
+            csvpath = self.modulePath + pathsym +  curItem.parent().parent().text(0)+ pathsym + curItem.parent().text(0)[:-4] + '_' +curItem.text(0)
+            df = pd.read_csv(csvpath)
+            
+            if curItem.childCount():
+                self.log_treeWidget.currentItem().setExpanded(True)
+            else:
+                for col in df.columns:
+                    if not 'timestamp' in col:
+                        colItem = QTreeWidgetItem(curItem)
+                        colItem.setText(0, col)
+                    
+        elif str(type(curItem.parent())) != "<class 'NoneType'>" and curItem.parent().text(0).find('.csv') != -1:
+            print(curItem.parent().text(0), curItem.text(0))
+            
+            csvpath = self.modulePath + pathsym +  curItem.parent().parent().parent().text(0)+ pathsym + curItem.parent().parent().text(0)[:-4] + '_' +curItem.parent().text(0)
+            df = pd.read_csv(csvpath)
             df_timestamp = df['timestamp']
-            df_log = df[str(self.clicked_log)]
+            df_log = df[curItem.text(0)]
             ax.plot(df_timestamp, df_log)
             ax.set_xlabel("timestamp")
 
@@ -298,31 +289,30 @@ class WindowClass(QMainWindow, form_class) :
             self.log_fig.tight_layout()
             self.log_canvas.show()
             self.log_canvas.draw()
+        
         else:
-            print("해당 경로에 CSV 파일이 없습니다.")
+            self.log_treeWidget.currentItem().setExpanded(True)
             
+        
+                    
 
     #TODO: 로그 데이터 경로 수정
     def onChange(self):
         tabIndex = self.tabWidget.indexOf(self.tabWidget.currentWidget())
         #비행 데이터
 
-        if tabIndex == 1:
+        if tabIndex == 0:
             self.modulePath = "./fs/microsd/dataman"
             
 
         #로그 데이터
 
-        elif tabIndex == 2:
+        elif tabIndex == 1:
             username = getpass.getuser()
-            self.modulePath = "C:/Users/" + username  + "/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/09_39_09.ulg"   
-            #정보 출력
-            self.fileInfo(self.modulePath, self.tableWidget_file_log)
-            self.logParams(self.tableWidget_log_params, self.modulePath)
-            self.logMessages(self.tableWidget_log_messages, self.modulePath)
+            self.modulePath = "."+ pathsym + 'fs' + pathsym + 'microsd' + pathsym  + 'log'   
                         
         #설정 데이터
-        elif tabIndex == 3:
+        elif tabIndex == 2:
             self.parameter_ui.show_parameter_list()
 
     def drawGraph(self, x, y, v, nav_cmd, title):
@@ -529,34 +519,14 @@ class WindowClass(QMainWindow, form_class) :
             datamanId = self.parser.get_mission()[3]
             encrypt = dataman_is_encrypted(self.parser.get_safe_points(), self.parser.get_fence_points(),
                                self.parser.get_mission_item(datamanId), self.parser.get_mission())
-            if self.ftp is not None:
-                inte = self.HMAC_calc(filename)
-            else:
-                inte = "unconnected"
-
-        if "ulg" in filename:
-            encrypt = is_encrypted(filename)
-            inte = True
+            
 
         created = createdTime(filename)
         hashSha = hash_sha1(filename)
         hashMD5 = hash_md5(filename)
 
-        if self.ftp is not None:
-            ftpcrc = self.ftp.get_crc_by_name(filename[filename.find("/"):], 0)
-            Crc = crc()
-            CrcResult = Crc.crc32Check(filename=filename, checksum=ftpcrc[1])
-        else:
-            CrcResult = "unconnected"
-
-
-        if encrypt == 0:
-            encrypt = "False"
-        elif encrypt ==1 :
-            encrypt = "True"
-
-        header = ["created", "MD5", "SHA-1","CRC", "integrity"]
-        data = [created, hashSha,hashMD5,CrcResult,inte]
+        header = ["created", "MD5", "SHA-1"]
+        data = [created, hashSha,hashMD5]
 
         table.setColumnCount(2)
         table.setRowCount(len(header))

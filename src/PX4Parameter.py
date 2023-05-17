@@ -18,6 +18,7 @@ def get_parameters():
     data1 = load_json("./etc/extras/parameters.json.xz")
     data2 = load_bson("./fs/microsd/parameters_backup.bson")
     
+    print(data1, data2)
     #print(data1['version'],data1['parameters'])
     #print(data2)
     
