@@ -16,3 +16,4 @@ obj/
 __pycache__/
 dataman*
 *.csv
+.vscode/
