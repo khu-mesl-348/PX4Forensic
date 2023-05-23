@@ -34,6 +34,8 @@ class Parameterclass:
 
     def show_parameter_list(self):
         self.param = get_parameters()
+        
+        
         for i in self.param:
             self.list.addItem(i['name'])
 

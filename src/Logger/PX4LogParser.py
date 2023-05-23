@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 # os.system('ulog_params fs/microsd/log/2022-07-18/09_39_09.ulg') #params
 
 # os.system('ulog_messages fs/microsd/log/2022-07-18/09_39_09.ulg') # log message
-filepath = "./fs/microsd/log" #절대경로
+filepath = "./data/fs/microsd/log" #절대경로
 
 def readCSV(filename):
         f = open(filename, 'r', encoding = "utf-8")
@@ -29,16 +29,20 @@ def readCSV(filename):
 
 def searchLogFile():
     print_log_list = {}
-    for dir in os.listdir(filepath):
-        d = os.path.join(filepath, dir)
-        print_log_list[d] = {}
-        if os.path.isdir(d):
-            for file in os.listdir(d):
-                f = os.path.join(d, file)
-                if file.find('.ulg') != -1:
-                    print_log_list[d][file] = []
-                elif file.find('csv') != -1:
-                    print_log_list[d][file[:8]+'.ulg'].append(file)
+    try:
+        for dir in os.listdir(filepath):
+            d = os.path.join(filepath, dir)
+            print_log_list[d] = {}
+            if os.path.isdir(d):
+                for file in os.listdir(d):
+                    f = os.path.join(d, file)
+                    if file.find('.ulg') != -1:
+                        print_log_list[d][file] = []
+                    elif file.find('csv') != -1:
+                        print_log_list[d][file[:8]+'.ulg'].append(file)
+    except:
+        print('No file in', filepath)
+        
                 
     return(print_log_list)
 

@@ -41,6 +41,19 @@ class FTPReader:
         fd_in = sys.stdin.fileno()
         self.ubuf_stdin = os.fdopen(fd_in, 'rb', buffering=0)
         self.root = root
+        
+        if root != '/':
+            try:
+                os.chdir(root)
+            except FileNotFoundError as e:
+                print(e)
+                os.mkdir(root)
+                os.chdir(root)
+                
+            os.chdir('..')
+            
+        
+            
         if _port is None:
             self.mav_port = None
         else:
@@ -258,7 +271,7 @@ class FTPReader:
     msg_buf = []
 
     # 파일명으로 Drone의 파일을 ftp 전송받는 함수
-    # @input: filename(ex. /fs/microse/dataman), MavlinkPort
+    # @input: filename(ex. /data/fs/microse/dataman), MavlinkPort
     # @output: file
     # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
     def get_file_by_name(self, filename):
@@ -422,7 +435,7 @@ class FTPReader:
         return res
 
         # 파일명으로 crc값을 전송받는 함수
-        # @input: filename(ex. /fs/microse/dataman), MavlinkPort
+        # @input: filename(ex. /data/fs/microse/dataman), MavlinkPort
         # @output: crc
         # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
     def get_crc_by_name(self, filename, seq_num):
@@ -497,7 +510,7 @@ class FTPReader:
         return res
 
     # Drone에 파일을 ftp 전송하는 함수
-    # @input: filename(ex. /fs/microse/dataman): 드론 상에서의 저장 위치, filepath: 보낼 파일의 경로, MavlinkPort
+    # @input: filename(ex. /data/fs/microse/dataman): 드론 상에서의 저장 위치, filepath: 보낼 파일의 경로, MavlinkPort
     # @output: 실행 결과
     # require: PX4 기기와 사용자 PC가 연결되어 있어야 함
     def send_file_by_name(filename, filepath, mav_port):

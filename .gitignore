@@ -10,8 +10,11 @@ fs/*
 !fs/microsd/2022-07-18
 !fs/microsd/2022-07-18/*ulg
 
+data/
 proc/
 obj/
+dist/
+build/
 .idea/
 __pycache__/
 dataman*

@@ -275,7 +275,7 @@ class missionParser:
         missionitem = mission_item_s(0, 0, 0, 0, 0, 0, 0, 0, [0,0,0,0,0,0,0], 0,0,0,0,0,0,0,0,0,0,0)
 
         if dataman_id != 2 and dataman_id != 3:
-            rseek = os.lseek(self.fd, os.path.getsize("./fs/microsd/dataman") - 14, os.SEEK_SET)
+            rseek = os.lseek(self.fd, os.path.getsize("./data/fs/microsd/dataman") - 14, os.SEEK_SET)
             dataman_id = struct.unpack('b', os.read(self.fd, 1))[0]
 
         if dataman_id == 2:

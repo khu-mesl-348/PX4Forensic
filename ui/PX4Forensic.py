@@ -27,6 +27,7 @@ from PyQt5.QtCore import QVariant
 from PyQt5 import uic
 from os import environ
 import os
+import shutil
 from matplotlib import patches
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -56,14 +57,6 @@ def suppress_qt_warnings():   # 해상도별 글자크기 강제 고정하는 �
 form_class = uic.loadUiType("ui/PX4Forensic.ui")[0]
 download_class = uic.loadUiType("ui/downloadProgress.ui")[0]
 
-#CSV 파일 존재 유무 확인
-username = getpass.getuser()
-dirpath = 'C:/Users/' + username + '/Desktop/PX4Forensic/fs/microsd/log/2022-07-18/'
-fileExe = '*.csv'
-csvlist = glob.glob(dirpath+fileExe)
-if csvlist == []:
-    shell_ulog_2_csv()
-
 
 #화면을 띄우는데 사용되는 Class 선언
 class WindowClass(QMainWindow, form_class) :
@@ -91,7 +84,7 @@ class WindowClass(QMainWindow, form_class) :
         self.LogTree()
 
 
-        self.dataman = "./fs/microsd/dataman"
+        self.dataman = "./data/fs/microsd/dataman"
 
         try:
             parser_fd = os.open(self.dataman, os.O_BINARY)
@@ -147,7 +140,7 @@ class WindowClass(QMainWindow, form_class) :
                 self.mavPort = None
                 self.label_connected.setText(f"unconnected")
 
-        self.ftp = FTPReader(_port=self.mavPort)
+        self.ftp = FTPReader(_port=self.mavPort, blacklist=['group/', 'mmcsd0', 'bin/', 'proc/', 'dev/', 'obj/'])
 
         return 1
 
@@ -232,12 +225,12 @@ class WindowClass(QMainWindow, form_class) :
         
         curItem = self.log_treeWidget.currentItem()
         
-        
+        self.modulePath = './data/fs/microsd/log'
         if curItem.text(0).find('.ulg') != -1:
             print("curitem:", curItem.text(0))
             self.log_treeWidget.currentItem().setExpanded(True)
             
-            logpath = self.modulePath + pathsym +  curItem.parent().text(0) + pathsym + curItem.text(0)
+            logpath = self.modulePath + pathsym + curItem.parent().text(0) + pathsym + curItem.text(0)
             
             print(logpath)
                 
@@ -289,9 +282,13 @@ class WindowClass(QMainWindow, form_class) :
             self.log_fig.tight_layout()
             self.log_canvas.show()
             self.log_canvas.draw()
+            
+           
         
         else:
             self.log_treeWidget.currentItem().setExpanded(True)
+            
+        self.modulePath = ''
             
         
                     
@@ -302,14 +299,14 @@ class WindowClass(QMainWindow, form_class) :
         #비행 데이터
 
         if tabIndex == 0:
-            self.modulePath = "./fs/microsd/dataman"
+            self.modulePath = "./data/fs/microsd/dataman"
             
 
         #로그 데이터
 
         elif tabIndex == 1:
-            username = getpass.getuser()
-            self.modulePath = "."+ pathsym + 'fs' + pathsym + 'microsd' + pathsym  + 'log'   
+            self.LogTree()
+            self.modulePath = "./data"+ pathsym + 'fs' + pathsym + 'microsd' + pathsym  + 'log'   
                         
         #설정 데이터
         elif tabIndex == 2:
@@ -393,12 +390,33 @@ class WindowClass(QMainWindow, form_class) :
 
 
     def getFileFromUAV(self):
-
+        
+   
+            
+        self.log_list = searchLogFile()
+        for item in self.log_list:            
+            shutil.rmtree(item)
+            
+        try:
+            os.chdir('./data')
+        except FileNotFoundError as e:
+            print(e)
+            os.mkdir('./data')
+            os.chdir('./data')
+            
         if self.ftp is None:
             res = self.connectSerial()
             if res == -1:
                 QMessageBox.about(self, '연결 오류', 'PX4와 연결되어 있지 않습니다.')
+                
+
                 return -1
+            
+        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setTabEnabled(0,False)
+        self.tabWidget.setTabEnabled(1,False)
+        self.tabWidget.setTabEnabled(2,False)
+        
         self.radio_safepoint.setDisabled(True)
         self.radio_geofencepoint.setDisabled(True)
         self.radio_waypoint.setDisabled(True)
@@ -482,25 +500,44 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.showMessage("")
         self.statusbar.repaint()
         self.progressbar.setValue(0)
-
+        
+        cwd = os.getcwd().split(pathsym)
+        # 마지막 폴더에서 나오기
+        print('cwd: ',cwd)
+        while i in range(len(cwd)-1, 0, -1):
+            if cwd[i] == 'data':
+                print(cwd[i])
+                break
+            os.chdir('..')
+        # data 폴더에서 나오기
+        os.chdir('..')
+        
         try:
-            parser_fd = os.open(self.modulePath, os.O_BINARY)
+            parser_fd = os.open('./data/fs/microsd/dataman', os.O_BINARY)
             self.parser = missionParser(parser_fd)
 
             # 파일 정보 표시(mission)
-            self.fileInfo(self.modulePath, self.tableWidget_file)
+            self.fileInfo('./data/fs/microsd/dataman', self.tableWidget_file)
 
         except FileNotFoundError as e:
             print(os.getcwd())
-            self.parser = None
-            print(e)
+            print('dataman open erroer', e)
             pass
-
+        
+        
+        self.parameter_ui.show_parameter_list()
+        
         QApplication.processEvents()
         self.dataRefreshButton.setEnabled(True)
         self.radio_safepoint.setEnabled(True)
         self.radio_geofencepoint.setEnabled(True)
         self.radio_waypoint.setEnabled(True)
+        
+        self.tabWidget.setTabEnabled(0,True)
+        self.tabWidget.setTabEnabled(1,True)
+        self.tabWidget.setTabEnabled(2,True)
+        
+        
 
     def fileInfo(self, filename, table):
         try:

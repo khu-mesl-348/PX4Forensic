@@ -15,14 +15,21 @@ import os
 
 def get_parameters():
     print(os.getcwd())
-    data1 = load_json("./etc/extras/parameters.json.xz")
-    data2 = load_bson("./fs/microsd/parameters_backup.bson")
+    res = []
+    try:
+        data1 = load_json("./data/etc/extras/parameters.json.xz")
+        data2 = load_bson("./data/fs/microsd/parameters_backup.bson")
+        
+    except FileNotFoundError as e:
+        print(e)
+        return res
+        
     
     print(data1, data2)
     #print(data1['version'],data1['parameters'])
     #print(data2)
     
-    res = []
+    
     for param in data1['parameters']:
         for backup in data2:
             if param['name'] == backup['name']:
