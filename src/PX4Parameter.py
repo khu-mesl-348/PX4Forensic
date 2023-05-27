@@ -25,7 +25,6 @@ def get_parameters():
         return res
         
     
-    print(data1, data2)
     #print(data1['version'],data1['parameters'])
     #print(data2)
     
