@@ -12,11 +12,17 @@ class MavlinkPort:
         self.ftp_buf = []
         self.port = devnum
         self.debug("Connecting with MAVLink to %s ..." % portname)
-        self.mav = mavutil.mavlink_connection(portname, autoreconnect=True, baud=baudrate)
+        self.mav = mavutil.mavlink_connection(portname, autoreconnect=False, baud=baudrate)
         self.mav.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GENERIC, mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
-        self.mav.wait_heartbeat()
-        self.debug("HEARTBEAT OK\n")
-        self.debug("Locked serial device\n")
+        print('Sending HEARTBEAT...')
+        self.health = self.mav.wait_heartbeat(timeout=5)
+        if self.health is None:
+            print('Connection Failed')
+            self.health = False
+        else:
+            self.debug("HEARTBEAT OK\n")
+            self.debug("Locked serial device\n")
+            self.health = True
 
     def debug(self, s, level=1):
         # write some debug text

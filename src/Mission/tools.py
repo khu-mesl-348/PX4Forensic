@@ -1,5 +1,6 @@
 from pymavlink import mavutil
 from src.MavPort import MavlinkPort
+from time import time
 
 
 # MavlinkSerialPort 객체에 시리얼 연결을 수행하여 반환
@@ -13,9 +14,6 @@ def SerialPort(port='auto',_b='57600'):
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',
                                                                  "*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*",
                                                                  '*PX4*', '*FMU*', '*PX*'])
-
-        for item in serial_list:
-            print(item)
 
         if len(serial_list) == 0:
             print("Error: no serial connection found")
@@ -31,20 +29,28 @@ def SerialPort(port='auto',_b='57600'):
 
     print("Connecting to MAVLINK...")
     try:
+        
         mav_serialport = MavlinkPort(port, baudrate=_b, devnum=10)  # 기본 baudrate 115200, 변경하는거 만들 필요 있음
-        mav_serialport.serial_write('\n')  # make sure the shell is started
-        while True:
-            data = mav_serialport.serial_read(4096)
-            if data and len(data) > 0:
-                if data.find('nsh>') != -1:
-                    break
-        print('PX4 connect complete')
+        if mav_serialport.health:
+            print('PX4 connect complete')
+            return mav_serialport
+        
+        else:
+            print('PX4 connect Failed')
+            return None
+        # mav_serialport.serial_write('\n')  # make sure the shell is started
+        # while True:
+        #     data = mav_serialport.serial_read(4096)
+        #     if data and len(data) > 0:
+        #         if data.find('nsh>') != -1:
+        #             break
+        
         
     except KeyboardInterrupt:
         print('Aborting')
         return
 
-    return mav_serialport
+    
 
 
 # PX4 기체에 명령어 전송

@@ -75,6 +75,7 @@ class WindowClass(QMainWindow, form_class) :
         self.mavPort = None
         self.label_connected.setText(f"unconnected")
         self.ftp = None
+        self.homedir = os.getcwd()
 
         self.connectSerial(serial=Serial)
         # 로고
@@ -97,7 +98,6 @@ class WindowClass(QMainWindow, form_class) :
             pass
         except AttributeError as a:
             print(a)
-            QMessageBox.about(self, '연결 오류', 'PX4와 연결되어 있지 않습니다.')
 
         # Mission - radiobox 트리거 함수 연결
         self.radio_safepoint.toggled.connect(self.safeClicked)
@@ -124,6 +124,8 @@ class WindowClass(QMainWindow, form_class) :
         return(tw.text())
 
     def connectSerial(self, serial = None):
+        
+        self.label_connected.setText(f"unconnected")
         if serial is not None:
             self.mavPort = SerialPort(serial)
             self.label_connected.setText(f"connected: {serial}")
@@ -131,14 +133,16 @@ class WindowClass(QMainWindow, form_class) :
             # port 연결
             serial_list = get_serial_item()
 
-            if len(serial_list) != 0:
-                if serial_list[0][0].find("통신 포트") > 0:
-                    return -1
-                self.mavPort = SerialPort(serial_list[0][0])
-                self.label_connected.setText(f"connected: {serial_list[0][1]}({serial_list[0][0]})")
-            else:
+            if type(serial_list) == "<class 'int'>" or len(serial_list) == 0:
                 self.mavPort = None
-                self.label_connected.setText(f"unconnected")
+            else:
+                for s in serial_list:
+                    self.mavPort = SerialPort(s[0])
+                    if self.mavPort is not None:
+                        print('port: ',s[1])
+                        self.label_connected.setText(f"connected: {s[1]}({s[0]})")
+                        break
+                
 
         self.ftp = FTPReader(_port=self.mavPort, blacklist=['group/', 'mmcsd0', 'bin/', 'proc/', 'dev/', 'obj/'])
 
@@ -158,8 +162,6 @@ class WindowClass(QMainWindow, form_class) :
         
         self.log_treeWidget.clear()
         self.log_list = searchLogFile()
-        print(self.log_list)
-        print(type(platform.system()))
         
         for item in self.log_list:
             print(item)
@@ -227,7 +229,7 @@ class WindowClass(QMainWindow, form_class) :
         
         self.modulePath = './data/fs/microsd/log'
         if curItem.text(0).find('.ulg') != -1:
-            print("curitem:", curItem.text(0))
+            
             self.log_treeWidget.currentItem().setExpanded(True)
             
             logpath = self.modulePath + pathsym + curItem.parent().text(0) + pathsym + curItem.text(0)
@@ -235,7 +237,6 @@ class WindowClass(QMainWindow, form_class) :
             print(logpath)
                 
             if not curItem.childCount():
-                
                 self.statusbar.showMessage('making csv...')
                 self.statusbar.repaint()
                 
@@ -392,7 +393,8 @@ class WindowClass(QMainWindow, form_class) :
     def getFileFromUAV(self):
         
    
-            
+        if self.mavPort == None:
+            return
         self.log_list = searchLogFile()
         for item in self.log_list:            
             shutil.rmtree(item)
@@ -501,16 +503,9 @@ class WindowClass(QMainWindow, form_class) :
         self.statusbar.repaint()
         self.progressbar.setValue(0)
         
-        cwd = os.getcwd().split(pathsym)
+        os.chdir(self.homedir)
         # 마지막 폴더에서 나오기
-        print('cwd: ',cwd)
-        while i in range(len(cwd)-1, 0, -1):
-            if cwd[i] == 'data':
-                print(cwd[i])
-                break
-            os.chdir('..')
-        # data 폴더에서 나오기
-        os.chdir('..')
+        print('cwd: ',os.getcwd())
         
         try:
             parser_fd = os.open('./data/fs/microsd/dataman', os.O_BINARY)
