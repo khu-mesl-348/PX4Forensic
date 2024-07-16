@@ -136,12 +136,15 @@ class WindowClass(QMainWindow, form_class) :
             if type(serial_list) == "<class 'int'>" or len(serial_list) == 0:
                 self.mavPort = None
             else:
-                for s in serial_list:
-                    self.mavPort = SerialPort(s[0])
-                    if self.mavPort is not None:
-                        print('port: ',s[1])
-                        self.label_connected.setText(f"connected: {s[1]}({s[0]})")
-                        break
+                try:    
+                    for s in serial_list:
+                        self.mavPort = SerialPort(s[0])
+                        if self.mavPort is not None:
+                            print('port: ',s[1])
+                            self.label_connected.setText(f"connected: {s[1]}({s[0]})")
+                            break
+                except PermissionError:
+                    print("PermissionError")
                 
 
         self.ftp = FTPReader(_port=self.mavPort, blacklist=['group/', 'mmcsd0', 'bin/', 'proc/', 'dev/', 'obj/'])
